@@ -54,34 +54,46 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
       const parsed = await parseMatchFixturesExcel(file);
       const rawMatchList = parsed.data && parsed.data.length > 0 ? parsed.data : [{}];
       
-      const mergedMatchesPayload = rawMatchList.map((m: any) => ({
-        ...m,
-        id: targetMatchId,
-        date: m.date || fixture.date,
-        opponent: m.opponent || fixture.opponent,
-        home_away: m.home_away || fixture.venue || 'Home',
-        our_score: m.our_score ?? m.goals ?? 0,
-        opponent_score: m.opponent_score ?? m.opp_goals ?? 0,
-        status: 'completed'
-      }));
+      // Ensure exactly 1 object exists for this match_id
+      const uniqueMatchMap = new Map<string, any>();
+      rawMatchList.forEach((m: any) => {
+        const matchId = String(targetMatchId || m.match_id || m.id).trim();
+        const cleanMatchPayload = {
+          ...m,
+          id: matchId,
+          date: m.date || fixture.date,
+          opponent: m.opponent || fixture.opponent,
+          home_away: m.home_away || fixture.venue || 'Home',
+          our_score: m.our_score ?? m.goals ?? 0,
+          opponent_score: m.opponent_score ?? m.opp_goals ?? 0,
+          status: 'completed'
+        };
+        uniqueMatchMap.set(matchId, cleanMatchPayload);
+      });
+
+      // Convert Map values back to array (Length MUST be 1 per fixture)
+      const finalPayloadArray = Array.from(uniqueMatchMap.values());
 
       // Detailed console logging
-      console.log("Upserting merged match data to Supabase:", mergedMatchesPayload);
+      console.log("Final Upsert Payload Array (Length should be 1):", finalPayloadArray);
       const { data, error } = await (supabase.from('matches') as any)
-        .upsert(mergedMatchesPayload, { onConflict: 'id' });
+        .upsert(finalPayloadArray, { onConflict: 'id' });
 
       if (error) {
         console.error("Upload error:", error);
       } else {
-        console.log("Upload successful! Re-fetching matches from DB...");
+        console.log("Upload successful with single row!", data);
       }
 
       // Mirror to DataService
-      await DataService.saveMatches(mergedMatchesPayload.map(m => DataService.migrateMatch(m)));
+      await DataService.saveMatches(finalPayloadArray.map(m => DataService.migrateMatch(m)));
 
       const successText = `Match data updated for match against ${fixture.opponent}`;
       setUploadStatus(successText);
       alert(successText);
+
+      // Reset file input value to prevent duplicate change event triggers
+      e.target.value = "";
 
       // Re-fetch matches from DB immediately to update UI instantly
       await loadFixtures();
