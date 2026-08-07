@@ -392,53 +392,21 @@ export class DataService {
     });
   }
 
-  // Matches
+  // Matches (Strict Read-Only Fetch)
   static async getMatches(forceRefresh = false): Promise<MatchData[]> {
     if (!forceRefresh) {
       const cached = this.getCached<MatchData[]>("matches");
       if (cached) return cached;
     }
     try {
-      const { data, error } = await supabase.from("matches").select("*");
+      const { data, error } = await supabase.from("matches").select("*").order("date", { ascending: false });
       if (!error && Array.isArray(data)) {
-        if (data.length > 0) {
-          const migrated = data.map(m => this.migrateMatch(m));
-          const reassigned = this.reassignMatchIds(migrated);
-          localStorage.setItem(MATCHES_LS_KEY, JSON.stringify(reassigned));
-          return this.setCached("matches", reassigned);
-        } else {
-          const cached = localStorage.getItem(MATCHES_LS_KEY);
-          if (cached) {
-            try {
-              const parsed = JSON.parse(cached);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                const migrated = parsed.map((m: any) => this.migrateMatch(m));
-                const reassigned = this.reassignMatchIds(migrated);
-                this.saveMatches(reassigned).catch(() => {});
-                return this.setCached("matches", reassigned);
-              }
-            } catch {}
-          }
-          localStorage.setItem(MATCHES_LS_KEY, JSON.stringify([]));
-          return this.setCached("matches", []);
-        }
+        const migrated = data.map(m => this.migrateMatch(m));
+        localStorage.setItem(MATCHES_LS_KEY, JSON.stringify(migrated));
+        return this.setCached("matches", migrated);
       }
     } catch (e) {
-      console.warn("Supabase error getting matches, falling back to LocalStorage:", e);
-    }
-
-    const cached = localStorage.getItem(MATCHES_LS_KEY);
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const migrated = parsed.map((m: any) => this.migrateMatch(m));
-          const reassigned = this.reassignMatchIds(migrated);
-          // Auto sync local storage matches to Supabase cloud
-          this.saveMatches(reassigned).catch(() => {});
-          return this.setCached("matches", reassigned);
-        }
-      } catch {}
+      console.warn("Supabase error getting matches:", e);
     }
 
     localStorage.setItem(MATCHES_LS_KEY, JSON.stringify([]));
@@ -1195,15 +1163,12 @@ export class DataService {
     // Clear memory cache so fresh data is pushed
     this.invalidateCache();
 
-    // 1. Sync Matches
+    // 1. Sync Matches (Read-only sync - do not auto-push local storage matches to Supabase)
     try {
       const matchesLS = localStorage.getItem(MATCHES_LS_KEY);
       if (matchesLS) {
         const matches: MatchData[] = JSON.parse(matchesLS);
-        if (matches.length > 0) {
-          await supabase.from("matches").upsert(this.sanitizeForSupabase(matches));
-          matchesSynced = matches.length;
-        }
+        matchesSynced = matches.length;
       }
     } catch (e) {
       console.warn("Sync matches error:", e);
