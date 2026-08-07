@@ -1871,9 +1871,9 @@ export class DataService {
     const userId = authUser?.id || "user_" + Math.random().toString(36).substr(2, 9);
     const playerId = `PLR-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
-    // 2. Immediately upsert profile into Supabase profiles table with status = 'pending' and username preserved
+    // 2. Immediately upsert profile into Supabase profiles table with status = 'pending' (Unified payload for all roles)
     try {
-      const profileData = {
+      const profilePayload = {
         id: userId,
         user_id: userId,
         player_id: playerId,
@@ -1886,14 +1886,15 @@ export class DataService {
         squad_number: null,
         is_onboarded: false,
         onboarding_completed: false,
-        status: 'pending'
+        status: 'pending',
+        created_at: new Date().toISOString()
       };
 
-      const { error: idErr } = await (supabase.from('profiles') as any).upsert(profileData, { onConflict: 'id' });
+      const { error: idErr } = await (supabase.from('profiles') as any).upsert([profilePayload], { onConflict: 'id' });
       if (idErr) {
-        const { error: userErr } = await (supabase.from('profiles') as any).upsert(profileData, { onConflict: 'user_id' });
+        const { error: userErr } = await (supabase.from('profiles') as any).upsert([profilePayload], { onConflict: 'user_id' });
         if (userErr) {
-          await (supabase.from('profiles') as any).upsert(profileData, { onConflict: 'username' });
+          await (supabase.from('profiles') as any).upsert([profilePayload], { onConflict: 'username' });
         }
       }
 
