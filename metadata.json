@@ -1,0 +1,6 @@
+{
+  "name": "Team Performance Analyzer",
+  "description": "A comprehensive team and individual performance analysis web application with Excel upload, automatic KPI calculations, opponent analysis, role-based user management, and dynamic player metric tracking depending on position.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

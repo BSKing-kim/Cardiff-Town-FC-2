@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Calibri", "Segoe UI", sans-serif, Arial;
+  --font-display: "Calibri", "Segoe UI", sans-serif, Arial;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+body, button, input, select, textarea, table {
+  font-family: 'Calibri', 'Segoe UI', sans-serif, Arial !important;
+}
+
+body {
+  background-color: #0b0f19; /* Cardiff Town FC Deep Dark Navy */
+  color: #f8fafc; /* Bright White */
+}
+
+/* Custom scrollbars for stats panel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0b0f19;
+}
+::-webkit-scrollbar-thumb {
+  background: #eab308; /* Tactical Gold */
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #f59e0b; /* Vibrant Yellow Gold */
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+.animate-shake {
+  animation: shake 0.4s ease-in-out;
+}
+
+/* Custom print media query configuration for high-fidelity vector PDF reports */
+@media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html, body, #root, #applet-viewport-root {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    background-color: #0b0f19 !important;
+    color: #f8fafc !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  header,
+  #desktop-menubar,
+  .no-print,
+  button,
+  select,
+  input,
+  form,
+  aside,
+  [role="tablist"],
+  #dashboard-filters {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .avoid-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Optimize layout sizes for clean A4 printing */
+  @page {
+    size: A4 portrait;
+    margin: 1cm;
+  }
+
+  main, #primary-viewport-pane {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  .overflow-y-auto, .overflow-x-auto, .overflow-auto {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+
+  /* Match Statistics Modal Print Optimization */
+  body:has(#match-analysis-modal-overlay) #primary-viewport-pane {
+    display: none !important;
+  }
+  body:has(#match-analysis-modal-overlay) footer {
+    display: none !important;
+  }
+  body:has(#match-analysis-modal-overlay) #match-analysis-modal-overlay {
+    position: static !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    z-index: auto !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+  body:has(#match-analysis-modal-overlay) #match-analysis-modal-overlay > div {
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    width: 100% !important;
+  }
+}
+
+.print-only {
+  display: none;
+}
+

@@ -1,0 +1,1764 @@
+import * as XLSX from "xlsx";
+import { MatchData, Player, CustomTeam } from "../types";
+import { supabase } from "./supabase";
+import { DataService } from "./dataService";
+
+export const parseAndUploadExcel = async (
+  file: File,
+  tableName: 'teams' | 'match_logs' | 'players'
+): Promise<{ count: number; data: any[]; errors?: string[] }> => {
+  if (!file) {
+    throw new Error("No file provided for Excel parsing.");
+  }
+
+  // 1. Convert File to ArrayBuffer
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array' });
+
+  if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
+    throw new Error("Excel file is empty or missing valid sheets.");
+  }
+
+  // Search for sheet named "Teams" or fallback to first sheet
+  const firstSheetName = workbook.SheetNames.find(s => s.toLowerCase().trim() === "teams") || workbook.SheetNames[0];
+  const firstSheet = workbook.Sheets[firstSheetName];
+  const rawRows: Record<string, any>[] = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+
+  if (!rawRows || rawRows.length === 0) {
+    throw new Error("Excel file is empty or missing valid rows.");
+  }
+
+  // Flexible Header Extraction & Coercion Helpers
+  const extractString = (row: Record<string, any>, aliases: string[]): string => {
+    const normAliases = aliases.map(a => a.toLowerCase().replace(/[^a-z0-9]/g, ""));
+    for (const [key, val] of Object.entries(row)) {
+      const normKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (normAliases.includes(normKey)) {
+        const strVal = String(val !== undefined && val !== null ? val : "").trim();
+        if (strVal !== "") return strVal;
+      }
+    }
+    return "";
+  };
+
+  const extractInt = (row: Record<string, any>, aliases: string[], defaultVal = 0): number => {
+    const strVal = extractString(row, aliases);
+    if (!strVal) return defaultVal;
+    const cleaned = strVal.replace(/[^0-9.-]/g, "");
+    const parsed = parseInt(cleaned, 10);
+    return isNaN(parsed) ? defaultVal : parsed;
+  };
+
+  let sanitizedPayload: any[] = [];
+
+  if (tableName === 'teams') {
+    sanitizedPayload = rawRows.map(row => {
+      const teamName = extractString(row, [
+        'Team Name (Mandatory)', 'Team Name', 'team_name', 'Team', '팀명', '팀 이름', 'Club Name', 'Name'
+      ]);
+      const teamIdRaw = extractString(row, [
+        'Team ID (Optional)', 'Team ID', 'team_id', 'ID', 'Team Code'
+      ]);
+      const shortName = extractString(row, [
+        'Short Name (Optional)', 'Short Name', 'short_name', 'Short Name / Code', 'Code', 'Abbr', 'Abbreviation', 'team_code', 'short_code'
+      ]);
+      const division = extractString(row, [
+        'Division (Optional)', 'Division', 'division', 'League', 'Tier', '리그', '디비전'
+      ]);
+      const homeVenue = extractString(row, [
+        'Home Venue (Optional)', 'Home Venue', 'home_venue', 'Venue', 'Stadium', 'Ground', '장소'
+      ]);
+
+      const generatedUuid = crypto.randomUUID();
+      let finalId = teamIdRaw;
+      let finalShortName = shortName;
+
+      if (!finalId) {
+        finalId = generatedUuid;
+      } else if (!finalShortName && finalId.length <= 8 && !finalId.includes('-')) {
+        finalShortName = finalId;
+        finalId = generatedUuid;
+      }
+
+      return {
+        id: finalId,
+        team_id: finalId,
+        team_name: teamName,
+        division: division || 'Premier Division',
+        home_venue: homeVenue,
+        short_name: finalShortName,
+        created_at: new Date().toISOString()
+      };
+    }).filter(row => row.team_name !== '');
+
+    if (sanitizedPayload.length === 0) {
+      throw new Error("No valid team rows with non-empty 'Team Name' were found in file.");
+    }
+
+    // 3. Upsert to Supabase targeting team_name
+    const { error } = await (supabase.from('teams') as any)
+      .upsert(sanitizedPayload, { onConflict: 'team_name' });
+
+    if (error) {
+      console.error("Supabase Upsert Error:", error.message);
+      const { error: fallbackError } = await (supabase.from('teams') as any).upsert(sanitizedPayload);
+      if (fallbackError) {
+        throw new Error(`Database import failed: ${fallbackError.message}`);
+      }
+    }
+
+    // Mirror to DataService / teams
+    await DataService.registerBulkTeams(sanitizedPayload);
+
+    return { count: sanitizedPayload.length, data: sanitizedPayload };
+  } else if (tableName === 'match_logs') {
+    // 1. Fetch profiles for automatic player_id mapping
+    const { data: profiles } = await (supabase.from('profiles') as any).select('player_id, full_name, username, id, user_id');
+    const profileMap = new Map<string, string>();
+    if (profiles && Array.isArray(profiles)) {
+      profiles.forEach((p: any) => {
+        const pid = p.player_id || p.id || p.user_id;
+        if (!pid) return;
+        if (p.full_name) profileMap.set(p.full_name.trim().toLowerCase(), pid);
+        if (p.username) profileMap.set(p.username.trim().toLowerCase(), pid);
+        if (p.id) profileMap.set(p.id.trim().toLowerCase(), pid);
+        if (p.user_id) profileMap.set(p.user_id.trim().toLowerCase(), pid);
+      });
+    }
+
+    sanitizedPayload = rawRows.map(row => {
+      const matchId = extractString(row, ['Match ID', 'match_id', 'Match', '매치ID', 'Game ID', 'ID']) || 'M01';
+      const playerName = extractString(row, ['Player Name', 'Full Name', 'player_name', '선수명', 'Name', 'Player']);
+      const providedPlayerId = extractString(row, ['Player ID', 'player_id', 'Shirt Number', '등번호', 'ID']);
+      const resolvedPlayerId = profileMap.get(playerName.trim().toLowerCase()) || (providedPlayerId && providedPlayerId !== matchId ? providedPlayerId : null) || `PLR-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+      const position = extractString(row, ['Position', 'position', 'Primary Position', '포지션']) || 'CM';
+
+      const goals = extractInt(row, ['Goals', 'goals', '득점', '골']);
+      const shots = extractInt(row, ['Shots', 'shots', '슈팅', '슛']);
+      const minutesPlayed = extractInt(row, ['Minutes Played', 'minutes_played', 'Mins', '출전시간']);
+      const totalPasses = extractInt(row, ['Total Passes', 'total_passes', 'Passes', '총 패스', '패스']);
+      const completedPasses = extractInt(row, ['Completed Passes', 'successful_passes', 'successfulPasses', '성공한 패스'], Math.round(totalPasses * 0.75));
+      const tackles = extractInt(row, ['Tackles', 'tackles', '태클']);
+      const interceptions = extractInt(row, ['Interceptions', 'interceptions', '가로채기']);
+
+      const recId = `${matchId}_${resolvedPlayerId || playerName.toLowerCase().replace(/[^a-z0-9]/g, "_")}`;
+
+      return {
+        id: recId,
+        match_id: matchId,
+        player_id: resolvedPlayerId,
+        player_name: playerName,
+        position: position,
+        minutes_played: minutesPlayed,
+        goals: goals,
+        shots: shots,
+        total_passes: totalPasses,
+        completed_passes: completedPasses,
+        tackles: tackles,
+        interceptions: interceptions,
+        created_at: new Date().toISOString()
+      };
+    }).filter(row => row.player_name !== '' || row.match_id !== '');
+
+    if (sanitizedPayload.length === 0) {
+      throw new Error("No valid match log entries found in file.");
+    }
+
+    try {
+      const { error } = await (supabase.from('match_logs') as any)
+        .upsert(sanitizedPayload, { onConflict: 'id' });
+      if (error) console.warn("Supabase match_logs upsert warning:", error.message);
+    } catch (e) {
+      console.warn("Supabase match_logs exception:", e);
+    }
+
+    // Mirror to DataService / player_match_records
+    await DataService.savePlayerMatchRecords(sanitizedPayload.map(r => ({
+      id: r.id,
+      matchId: r.match_id,
+      playerId: r.player_id,
+      playerName: r.player_name,
+      position: r.position,
+      minutesPlayed: r.minutes_played,
+      goals: r.goals,
+      shots: r.shots,
+      totalPasses: r.total_passes,
+      completedPasses: r.completed_passes,
+      tackles: r.tackles,
+      interceptions: r.interceptions
+    })));
+
+    return { count: sanitizedPayload.length, data: sanitizedPayload };
+  } else if (tableName === 'players') {
+    sanitizedPayload = rawRows.map(row => {
+      const playerName = extractString(row, ['Full Name', 'Player Name', 'player_name', '선수명', '이름', 'Name']);
+      const playerId = extractString(row, ['Player ID', 'player_id', 'Shirt Number', '등번호', 'ID']);
+      const position = extractString(row, ['Primary Position', 'Position', 'position', '포지션']) || 'CM';
+      const preferredFoot = extractString(row, ['Preferred Foot', 'preferred_foot', '주발']) || 'Right';
+      const nationality = extractString(row, ['Nationality', 'nationality', '국적']) || 'Wales';
+      const division = extractString(row, ['Division', 'division', 'League', 'Role', '디비전']) || 'CCFL First';
+
+      const pid = playerId || `CTFC-${playerName.toLowerCase().replace(/[^a-z0-9]/g, "_")}`;
+
+      return {
+        id: pid,
+        name: playerName,
+        position: position,
+        preferred_foot: preferredFoot,
+        nationality: nationality,
+        division: division,
+        created_at: new Date().toISOString()
+      };
+    }).filter(row => row.name !== '');
+
+    if (sanitizedPayload.length === 0) {
+      throw new Error("No valid player rows found in file.");
+    }
+
+    try {
+      const { error } = await (supabase.from('players') as any)
+        .upsert(sanitizedPayload);
+      if (error) console.warn("Supabase players upsert warning:", error.message);
+    } catch (e) {
+      console.warn("Supabase players exception:", e);
+    }
+
+    // Mirror to DataService / players & profiles
+    await DataService.savePlayers(sanitizedPayload.map(r => DataService.migratePlayer({
+      id: r.id,
+      name: r.name,
+      position: r.position,
+      preferredFoot: r.preferred_foot,
+      nationality: r.nationality,
+      division: r.division
+    })));
+
+    return { count: sanitizedPayload.length, data: sanitizedPayload };
+  }
+
+  return { count: 0, data: [] };
+};
+
+export const handlePlayerExcelUpload = async (file: File) => {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array' });
+  const sheetName = workbook.SheetNames[0];
+  const rawRows: Record<string, any>[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '' });
+
+  if (!rawRows || rawRows.length === 0) {
+    throw new Error("Excel file is empty.");
+  }
+
+  // 1. Sanitize payload array
+  const sanitizedPlayers = rawRows.map(row => ({
+    name: String(row['Player Name'] || row['Name'] || row['name'] || row['선수명'] || '').trim(),
+    team_name: String(row['Team'] || row['team_name'] || row['팀명'] || '').trim(),
+    position: String(row['Position'] || row['position'] || row['포지션'] || 'MF').trim(),
+    jersey_number: parseInt(row['Number'] || row['jersey_number'] || row['등번호'] || '0', 10),
+    preferred_foot: String(row['Preferred Foot'] || row['foot'] || 'Right').trim()
+  })).filter(p => p.name.length > 0);
+
+  if (sanitizedPlayers.length === 0) {
+    throw new Error("No valid player rows found.");
+  }
+
+  // 2. Perform SINGLE BULK UPSERT to 'players' table
+  const { data, error } = await (supabase.from('players') as any)
+    .upsert(sanitizedPlayers);
+
+  if (error) {
+    console.error("Bulk Player Upsert Error:", error);
+    throw error;
+  }
+
+  // 3. Also sync to 'profiles' table for roster compatibility
+  const sanitizedProfiles = sanitizedPlayers.map(p => {
+    const username = p.name.toLowerCase().replace(/\s+/g, '_');
+    const playerId = `PLR-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    return {
+      full_name: p.name,
+      username: username,
+      player_id: playerId,
+      role: 'Player',
+      position: p.position
+    };
+  });
+
+  await (supabase.from('profiles') as any).upsert(sanitizedProfiles, { onConflict: 'username' });
+
+  return sanitizedPlayers.length;
+};
+
+export const handleMatchLogUpload = async (file: File): Promise<number> => {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array' });
+  const sheetName = workbook.SheetNames[0];
+  const rawRows: Record<string, any>[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '' });
+
+  // Fetch all profiles for mapping
+  const { data: profiles } = await (supabase.from('profiles') as any).select('player_id, full_name, username, id, user_id');
+  
+  const profileMap = new Map<string, string>();
+  if (profiles && Array.isArray(profiles)) {
+    profiles.forEach((p: any) => {
+      const pid = p.player_id || p.id || p.user_id;
+      if (!pid) return;
+      if (p.full_name) profileMap.set(p.full_name.trim().toLowerCase(), pid);
+      if (p.username) profileMap.set(p.username.trim().toLowerCase(), pid);
+      if (p.id) profileMap.set(p.id.trim().toLowerCase(), pid);
+    });
+  }
+
+  const matchLogsToInsert = rawRows.map(row => {
+    const playerName = String(row['Player Name'] || row['Player'] || row['player_name'] || row['선수명'] || row['Name'] || '').trim();
+    const matchId = String(row['Match ID'] || row['match_id'] || row['Game ID'] || 'M01').trim();
+    const providedId = String(row['Player ID'] || row['player_id'] || '').trim();
+    const resolvedPlayerId = profileMap.get(playerName.toLowerCase()) || (providedId && providedId !== matchId ? providedId : null) || `PLR-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+
+    const goals = parseInt(row['Goals'] || row['goals'] || row['득점'] || '0', 10) || 0;
+    const assists = parseInt(row['Assists'] || row['assists'] || row['도움'] || '0', 10) || 0;
+    const passes = parseInt(row['Passes'] || row['total_passes'] || row['totalPasses'] || '0', 10) || 0;
+    const tackles = parseInt(row['Tackles'] || row['tackles'] || '0', 10) || 0;
+    const teamName = String(row['Team'] || row['team_name'] || row['Team Name'] || '').trim();
+
+    const recId = `${matchId}_${resolvedPlayerId || playerName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+
+    return {
+      id: recId,
+      match_id: matchId,
+      player_name: playerName,
+      player_id: resolvedPlayerId, // Automatically mapped ID
+      goals: goals,
+      assists: assists,
+      passes: passes,
+      total_passes: passes,
+      tackles: tackles,
+      team_name: teamName,
+      created_at: new Date().toISOString()
+    };
+  }).filter(log => log.player_name.length > 0);
+
+  // Single Bulk Upsert
+  const { error } = await (supabase.from('match_logs') as any).upsert(matchLogsToInsert);
+  if (error) throw error;
+
+  await DataService.savePlayerMatchRecords(matchLogsToInsert.map((r: any) => ({
+    id: r.id,
+    matchId: r.match_id,
+    playerId: r.player_id,
+    playerName: r.player_name,
+    goals: r.goals,
+    assists: r.assists,
+    totalPasses: r.passes || r.total_passes,
+    tackles: r.tackles
+  })));
+
+  return matchLogsToInsert.length;
+};
+
+export const handleRosterUpload = async (file: File): Promise<number> => {
+  return handlePlayerExcelUpload(file);
+};
+
+export const selfSimulateExcelUpload = async (): Promise<{ success: boolean; details: string }> => {
+  try {
+    const sampleTeams = [
+      { "Team Name (Mandatory)": "Cardiff Town FC", "Short Name (Optional)": "CTFC", "Division (Optional)": "Premier Division", "Home Venue (Optional)": "Cardiff Sports Village" },
+      { "Team Name (Mandatory)": "AFC Roath", "Short Name (Optional)": "AFCR", "Division (Optional)": "Division 1", "Home Venue (Optional)": "Roath Park" }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(sampleTeams);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Teams");
+    const outBuf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const testFile = new File([outBuf], "test_teams.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+
+    const res = await parseAndUploadExcel(testFile, "teams");
+    if (res.count === 2 && res.data[0].team_name === "Cardiff Town FC") {
+      return { success: true, details: "Self-test passed: Client binary XLSX parsed into 2 sanitized team rows with auto-assigned Team IDs, mapped to exact Supabase keys and upserted successfully." };
+    } else {
+      return { success: false, details: `Self-test failed: Unexpected result count ${res.count}` };
+    }
+  } catch (err: any) {
+    return { success: false, details: `Self-test failed with exception: ${err?.message || String(err)}` };
+  }
+};
+
+export interface ParsedTeamRegistrationRow {
+  id: string;
+  team_id: string;
+  team_name: string;
+  division: string;
+  home_venue?: string;
+  short_code?: string;
+  created_at?: string;
+}
+
+export interface TeamRegistrationParseResult {
+  validRecords: ParsedTeamRegistrationRow[];
+  totalRows: number;
+  errorRows: number;
+  errorDetails: string[];
+}
+
+// Standard professional football analytics English terminology
+export const MATCH_HEADERS_MAP = {
+  "Match Date": "date",
+  "Competition": "competition",
+  "Team Name": "teamName", // Single sheet column to divide our team and opponent team!
+  "Opponent": "opponent",
+  "Venue": "venue",
+  "Result": "result",
+  
+  // Passes PIs
+  "Backward Passes": "backwardPasses",
+  "Forward Passes": "forwardPasses",
+  "Sideways Passes": "sidewaysPasses",
+  "Crosses": "crosses",
+  "Through Balls": "throughBalls",
+  "Key Passes": "keyPasses",
+  
+  // Dribble PIs
+  "1v1 Dribble Success": "dribbleSuccess",
+  "1v1 Dribble Fail": "dribbleFail",
+  
+  // Shot PIs
+  "Shots on Target": "shotOnTarget",
+  "Shots off Target": "shotOffTarget",
+  "Blocked Shots": "shotBlocked",
+  "Goals": "goals",
+  
+  // Progression PIs
+  "Final Third Entry": "finalThirdEntry",
+  "Penalty Area Entry": "penaltyAreaEntry",
+  
+  // Duel PIs
+  "Aerial Duel Win": "aerialDuelWin",
+  "Aerial Duel Loss": "aerialDuelLoss",
+  "Ground Duel Win": "groundDuelWin",
+  "Ground Duel Loss": "groundDuelLoss",
+  
+  // Defensive PIs
+  "Tackles": "tackle",
+  "Interceptions": "interception",
+  "Clearances": "clearance",
+  "Blocked Shot Defending": "blockedShot",
+  "Fouls Committed": "foul",
+  "Fouls Suffered": "wasFouled",
+  "Dribbled Past": "dribbledPast",
+  
+  // Recovery PIs
+  "Ball Recovery": "ballRecovery",
+  
+  // Pressing PIs
+  "High Press Success": "highPressSuccess",
+  "Pressing Bypassed": "pressingBypassed",
+  
+  // Turnover PIs
+  "Miscontrols": "miscontrol",
+  "Dispossessions": "dispossessed",
+  "Failed Passes": "failedPass",
+  "Unsuccessful Dribbles": "unsuccessfulDribble",
+  "Offsides": "offside",
+  "Possession Lost": "possessionLost",
+  
+  // GK Distribution PIs
+  "GK Long Kick": "longKick",
+  "GK Short Pass": "shotPass",
+  "GK Goal Kick": "goalKick",
+  
+  // GK Save PIs
+  "GK Catch": "gkCatch",
+  "GK Parried Safe": "parriedSafe",
+  "GK Parried Danger": "parriedDanger",
+  
+  // GK Positioning PIs
+  "GK Sweeper Action": "sweeperAction",
+  "GK 1v1 Save": "gk1v1Save",
+  
+  // GK Claim PIs
+  "GK High Claim": "highClaim",
+  "GK Punch": "gkPunch",
+  "GK Flapped": "gkFlapped",
+  
+  // Set Piece PIs
+  "Corner Defending": "cornerD",
+  "Free Kick Defending": "freeKickD",
+  "Corner Attacking": "cornerA",
+  "Free Kick Attacking": "freeKickA"
+};
+
+export const PLAYER_HEADERS_MAP = {
+  // Player Identifiers
+  "Full Name": "name",
+  "Player Name": "name",
+  "Player ID": "backNumber",
+  "Primary Position": "position",
+  "Position": "position",
+  "Preferred Foot": "preferredFoot",
+  "Nationality": "nationality",
+  "Date of Birth": "dob",
+  "Shirt Number": "backNumber",
+  "Join Date": "joinDate",
+  "Minutes Played": "minutesPlayed",
+
+  // Shots Category
+  "Goals": "goals",
+  "Shots": "shots",
+  "Shot Accuracy": "shotAccuracy",
+  "Shots Inside Box": "insideBoxShots",
+  "Shots Outside Box": "shotsOutsideBox",
+  "Headed Shots": "headedShots",
+  "Blocked Shots": "blockedShots",
+
+  // Passes Category
+  "Total Passes": "totalPasses",
+  "Completed Passes": "successfulPasses",
+  "Long Passes": "longPasses",
+  "Completed Long Passes": "completedLongPasses",
+  "Passes Opponent Half": "passesInOpponentsHalf",
+  "Completed Opponent Half": "completedOpponentHalf",
+  "Passes Final Third": "finalThirdPasses",
+  "Completed Final Third": "completedFinalThirdPasses",
+  "Forward Passes": "progressivePasses",
+  "Through Balls": "throughBalls",
+  "Crosses": "crossesAttempted",
+  "Completed Crosses": "successfulCrosses",
+
+  // Duels & Distribution
+  "Possession (%)": "possession",
+  "Possession": "possession",
+  "Duels": "duels",
+  "Duels Won": "duelsWon",
+  "Aerial Duels": "aerialDuels",
+  "Aerial Duels Won": "aerialDuelsWon",
+  "Ground Duels": "groundDuels",
+  "Ground Duels Won": "groundDuelsWon",
+  "Final Third Entries": "finalThirdEntries",
+  "Box Entries": "boxEntries",
+
+  // Defense & Discipline
+  "Tackles": "tacklesAttempted",
+  "Tackles Won": "tacklesWon",
+  "Clearances": "clearances",
+  "Interceptions": "interceptions",
+  "Blocks": "blocks",
+  "Recovery Rate": "ballRecoveries",
+  "Corners": "corners",
+  "Fouls": "fouls",
+  "Was Fouled": "wasFouled",
+  "Yellow Cards": "yellowCards",
+  "Red Cards": "redCard",
+
+  // Legacy mappings for backward compatibility
+  "Assists": "assists",
+  "Chances Created": "chancesCreated",
+  "Touches": "touches",
+  "Progressive Carries": "progressiveCarries",
+  "Progressive Dribbles": "progressiveDribbles",
+  "Defensive Duels": "defensiveDuels",
+  "Defensive Duels Won": "defensiveDuelsWon",
+  "Dribbles Attempted": "dribblesAttempted",
+  "Successful Dribbles": "successfulDribbles",
+  "Save Attempts": "saveAttempts",
+  "Saves": "saves",
+  "Cross Claims": "crossClaims",
+  "Sweeper Actions": "sweeperActions",
+  "Clean Sheets": "cleanSheets"
+};
+
+// Map of standard English headers to their English/Korean aliases
+export const HEADER_ALIASES: Record<string, string[]> = {
+  "Full Name": ["full name", "fullname", "player name", "선수명", "선수 이름", "이름", "성명", "name", "player"],
+  "Player Name": ["player name", "full name", "fullname", "선수명", "선수 이름", "이름", "성명", "name", "player"],
+  "Player ID": ["player id", "playerid", "선수 id", "선수id", "id", "shirt number", "back number", "등번호", "no", "jersey number"],
+  "Primary Position": ["primary position", "position", "포지션", "역할", "위치", "pos"],
+  "Position": ["position", "primary position", "포지션", "역할", "위치", "pos"],
+  "Preferred Foot": ["preferred foot", "주발", "주로 쓰는 발", "preferredfoot", "주로쓰는발"],
+  "Nationality": ["nationality", "국적", "나라", "국가"],
+  "Date of Birth": ["date of birth", "생년월일", "생일", "dob", "birth date", "birthdate"],
+  "Shirt Number": ["shirt number", "등번호", "배번호", "back number", "jersey number", "번호", "no", "no."],
+  "Join Date": ["join date", "가입일", "입단일", "등록일", "join", "joindate"],
+  "Minutes Played": ["minutes played", "출전 시간", "출전시간", "분", "mins", "minutes"],
+
+  "Match Date": ["match date", "경기일자", "경기 일자", "날짜", "date", "matchdate"],
+  "Competition": ["competition", "대회", "리그", "구분", "comp"],
+  "Team Name": ["team name", "팀명", "팀 이름", "팀", "team"],
+  "Opponent": ["opponent", "상대", "상대팀", "상대 팀", "opp"],
+  "Venue": ["venue", "장소", "홈어웨이", "홈/어웨이"],
+  "Result": ["result", "결과", "경기결과", "경기 결과"],
+
+  "Goals": ["goals", "득점", "골", "득점 수"],
+  "Shots": ["shots", "슈팅", "슛"],
+  "Shot Accuracy": ["shot accuracy", "shot accuracy total", "shots on target %", "유효 슈팅률", "유효슛 비율", "shots on target", "유효 슈팅"],
+  "Shots Inside Box": ["shots inside box", "shots inside the box", "box shots", "박스 안 슈팅"],
+  "Shots Outside Box": ["shots outside box", "shots outside the box", "long shots", "박스 밖 슈팅"],
+  "Headed Shots": ["headed shots", "headers", "헤더 슈팅", "헤딩 슛"],
+  "Blocked Shots": ["blocked shots", "차단된 슈팅"],
+
+  "Total Passes": ["total passes", "passes", "총 패스", "패스", "패스 시도", "패스 수"],
+  "Completed Passes": ["completed passes", "successful passes", "성공한 패스", "패스 성공"],
+  "Long Passes": ["long passes", "롱 패스"],
+  "Completed Long Passes": ["completed long passes", "successful long passes", "성공한 롱 패스"],
+  "Passes Opponent Half": ["passes opponent half", "passes in opponents half", "상대 진영 패스"],
+  "Completed Opponent Half": ["completed opponent half", "successful passes in opponents half", "상대 진영 패스 성공"],
+  "Passes Final Third": ["passes final third", "passes in final third", "final third passes", "파이널 서드 패스"],
+  "Completed Final Third": ["completed final third", "successful final third passes", "파이널 서드 패스 성공"],
+  "Forward Passes": ["forward passes", "progressive passes", "전진 패스"],
+  "Through Balls": ["through balls", "스루 패스", "침투 패스"],
+  "Crosses": ["crosses", "crosses attempted", "크로스", "크로스 시도"],
+  "Completed Crosses": ["completed crosses", "successful crosses", "크로스 성공"],
+
+  "Possession (%)": ["possession (%)", "possession", "점유율"],
+  "Duels": ["duels", "경합"],
+  "Duels Won": ["duels won", "경합 성공"],
+  "Aerial Duels": ["aerial duels", "공중 경합", "공중볼 경합"],
+  "Aerial Duels Won": ["aerial duels won", "공중 경합 성공"],
+  "Ground Duels": ["ground duels", "지상 경합"],
+  "Ground Duels Won": ["ground duels won", "지상 경합 성공"],
+  "Final Third Entries": ["final third entries", "파이널 서드 진입"],
+  "Box Entries": ["box entries", "penalty area entries", "박스 진입", "페널티 에어리어 진입"],
+
+  "Tackles": ["tackles", "tackles attempted", "태클 시도", "태클"],
+  "Tackles Won": ["tackles won", "태클 성공"],
+  "Clearances": ["clearances", "clearance", "걷어내기", "클리어링"],
+  "Interceptions": ["interceptions", "가로채기", "인터셉트"],
+  "Blocks": ["blocks", "차단"],
+  "Recovery Rate": ["recovery rate", "recoveries", "ball recoveries", "볼 리커버리", "볼 회복", "리커버리"],
+  "Corners": ["corners", "corner", "코너킥"],
+  "Fouls": ["fouls", "foul committed", "파울", "파울 범함"],
+  "Was Fouled": ["was fouled", "fouls won", "파울 당함", "피파울"],
+  "Yellow Cards": ["yellow cards", "yellow card", "경고", "옐로카드"],
+  "Red Cards": ["red cards", "red card", "퇴장", "레드카드"]
+};
+
+// Map of match player record identifiers to their aliases
+export const MATCH_IDENTIFIER_ALIASES: Record<string, string[]> = {
+  "Match ID": ["match id", "매치 id", "경기 id", "매치id", "경기id", "match", "game id"],
+  "Team ID": ["team id", "팀 id", "팀id", "team"],
+  "Player ID": ["player id", "playerid", "선수 id", "선수id", "id", "shirt number", "back number", "등번호"],
+  "Player Name": ["player name", "full name", "fullname", "선수명", "선수 이름", "이름", "성명", "name", "player"],
+  "Full Name": ["full name", "player name", "fullname", "선수명", "선수 이름", "이름", "성명", "name", "player"],
+  "Shirt Number": ["shirt number", "등번호", "배번호", "back number", "jersey number", "번호", "no", "no."],
+  "Position": ["position", "primary position", "포지션", "역할", "위치", "pos"],
+  "Primary Position": ["primary position", "position", "포지션", "역할", "위치", "pos"]
+};
+
+export interface ExcelParseResult<T> {
+  validRecords: T[];
+  totalRows: number;
+  errorRows: number;
+  errorDetails: string[];
+}
+
+export class ExcelUtils {
+  // Helper to dynamically scan all sheet names and find the best matching sheet
+  static findOptimalSheet(workbook: any, headerKey: string, useMatchAliases: boolean = false): string {
+    const aliases = useMatchAliases 
+      ? (MATCH_IDENTIFIER_ALIASES[headerKey] || [headerKey])
+      : (HEADER_ALIASES[headerKey] || [headerKey]);
+    const normalizedAliases = aliases.map(a => a.toLowerCase().trim());
+
+    if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
+      return "";
+    }
+
+    // Try to find sheet where at least one header cell matches aliases
+    for (const name of workbook.SheetNames) {
+      const sheet = workbook.Sheets[name];
+      if (!sheet || !sheet['!ref']) continue;
+      try {
+        const XLSX = (window as any).XLSX || require("xlsx");
+        const range = XLSX.utils.decode_range(sheet['!ref']);
+        const scanRows = Math.min(range.s.r + 10, range.e.r);
+        for (let row = range.s.r; row <= scanRows; row++) {
+          for (let col = range.s.c; col <= range.e.c; col++) {
+            const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+            const cell = sheet[cellAddress];
+            if (cell && cell.v !== undefined && cell.v !== null) {
+              const val = String(cell.v).trim().toLowerCase();
+              if (normalizedAliases.some(alias => alias === val)) {
+                return name;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(`Error scanning sheet ${name} for optimal layout:`, err);
+      }
+    }
+    return workbook.SheetNames[0];
+  }
+
+  // Helper to find the actual header row index in a sheet to support arbitrary title blocks and empty lines
+  static findHeaderRowIndex(sheet: any, headerKey: string, useMatchAliases: boolean = false): number {
+    if (!sheet || !sheet['!ref']) return 0;
+    try {
+      const XLSX = (window as any).XLSX || require("xlsx");
+      const range = XLSX.utils.decode_range(sheet['!ref']);
+      const aliases = useMatchAliases 
+        ? (MATCH_IDENTIFIER_ALIASES[headerKey] || [headerKey])
+        : (HEADER_ALIASES[headerKey] || [headerKey]);
+      const normalizedAliases = aliases.map(a => a.toLowerCase().trim());
+
+      let bestRow = range.s.r;
+      let maxMatches = 0;
+
+      const scanRows = Math.min(range.s.r + 15, range.e.r);
+      for (let row = range.s.r; row <= scanRows; row++) {
+        let matchesInRow = 0;
+        for (let col = range.s.c; col <= range.e.c; col++) {
+          const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+          const cell = sheet[cellAddress];
+          if (cell && cell.v !== undefined && cell.v !== null) {
+            const val = String(cell.v).trim().toLowerCase();
+            if (normalizedAliases.some(alias => alias === val)) {
+              matchesInRow++;
+            }
+          }
+        }
+        if (matchesInRow > maxMatches) {
+          maxMatches = matchesInRow;
+          bestRow = row;
+        }
+      }
+      return bestRow;
+    } catch (err) {
+      console.warn("Error finding header row index in sheet:", err);
+      return 0;
+    }
+  }
+
+  // Helper to find value by header key or aliases case-insensitively
+  static findRowValue(row: Record<string, any>, headerKey: string): any {
+    const aliases = HEADER_ALIASES[headerKey] || [headerKey];
+    const rowKeys = Object.keys(row);
+    for (const key of rowKeys) {
+      const normalizedKey = key.trim().toLowerCase();
+      if (aliases.some(alias => alias.toLowerCase() === normalizedKey)) {
+        return row[key];
+      }
+    }
+    return undefined;
+  }
+
+  // Helper to find match identifier value by key
+  static findMatchIdentifierValue(row: Record<string, any>, headerKey: string): any {
+    const aliases = MATCH_IDENTIFIER_ALIASES[headerKey] || [headerKey];
+    const rowKeys = Object.keys(row);
+    for (const key of rowKeys) {
+      const normalizedKey = key.trim().toLowerCase();
+      if (aliases.some(alias => alias.toLowerCase() === normalizedKey)) {
+        return row[key];
+      }
+    }
+    return undefined;
+  }
+
+  // Download match excel template (Match Performance Data Template)
+  static downloadMatchPerformanceTemplate(): void {
+    const headers = [
+      "Match ID",
+      "Player Name",
+      "Player ID",
+      "Position",
+      "Minutes Played",
+      "Goals",
+      "Shots",
+      "Shot Accuracy",
+      "Shots Inside Box",
+      "Shots Outside Box",
+      "Headed Shots",
+      "Blocked Shots",
+      "Total Passes",
+      "Completed Passes",
+      "Long Passes",
+      "Completed Long Passes",
+      "Passes Opponent Half",
+      "Completed Opponent Half",
+      "Passes Final Third",
+      "Completed Final Third",
+      "Forward Passes",
+      "Through Balls",
+      "Crosses",
+      "Completed Crosses",
+      "Possession (%)",
+      "Duels",
+      "Duels Won",
+      "Aerial Duels",
+      "Aerial Duels Won",
+      "Ground Duels",
+      "Ground Duels Won",
+      "Final Third Entries",
+      "Box Entries",
+      "Tackles",
+      "Tackles Won",
+      "Clearances",
+      "Interceptions",
+      "Blocks",
+      "Recovery Rate",
+      "Corners",
+      "Fouls",
+      "Was Fouled",
+      "Yellow Cards",
+      "Red Cards"
+    ];
+
+    const sampleRows: any[] = [
+      {
+        "Match ID": "M01",
+        "Player Name": "Liam Davies",
+        "Player ID": "CTFC-101",
+        "Position": "CF",
+        "Minutes Played": 90,
+        "Goals": 1,
+        "Shots": 4,
+        "Shot Accuracy": "75%",
+        "Shots Inside Box": 3,
+        "Shots Outside Box": 1,
+        "Headed Shots": 1,
+        "Blocked Shots": 0,
+        "Total Passes": 28,
+        "Completed Passes": 22,
+        "Long Passes": 2,
+        "Completed Long Passes": 1,
+        "Passes Opponent Half": 20,
+        "Completed Opponent Half": 16,
+        "Passes Final Third": 12,
+        "Completed Final Third": 9,
+        "Forward Passes": 8,
+        "Through Balls": 2,
+        "Crosses": 3,
+        "Completed Crosses": 2,
+        "Possession (%)": "54%",
+        "Duels": 12,
+        "Duels Won": 7,
+        "Aerial Duels": 5,
+        "Aerial Duels Won": 3,
+        "Ground Duels": 7,
+        "Ground Duels Won": 4,
+        "Final Third Entries": 6,
+        "Box Entries": 4,
+        "Tackles": 3,
+        "Tackles Won": 2,
+        "Clearances": 1,
+        "Interceptions": 2,
+        "Blocks": 1,
+        "Recovery Rate": 5,
+        "Corners": 2,
+        "Fouls": 1,
+        "Was Fouled": 3,
+        "Yellow Cards": 0,
+        "Red Cards": 0
+      },
+      {
+        "Match ID": "M01",
+        "Player Name": "Gethin Vaughan",
+        "Player ID": "CTFC-102",
+        "Position": "CM",
+        "Minutes Played": 85,
+        "Goals": 0,
+        "Shots": 2,
+        "Shot Accuracy": "50%",
+        "Shots Inside Box": 1,
+        "Shots Outside Box": 1,
+        "Headed Shots": 0,
+        "Blocked Shots": 1,
+        "Total Passes": 52,
+        "Completed Passes": 46,
+        "Long Passes": 6,
+        "Completed Long Passes": 5,
+        "Passes Opponent Half": 34,
+        "Completed Opponent Half": 30,
+        "Passes Final Third": 18,
+        "Completed Final Third": 15,
+        "Forward Passes": 16,
+        "Through Balls": 4,
+        "Crosses": 2,
+        "Completed Crosses": 1,
+        "Possession (%)": "58%",
+        "Duels": 14,
+        "Duels Won": 9,
+        "Aerial Duels": 4,
+        "Aerial Duels Won": 2,
+        "Ground Duels": 10,
+        "Ground Duels Won": 7,
+        "Final Third Entries": 8,
+        "Box Entries": 3,
+        "Tackles": 5,
+        "Tackles Won": 4,
+        "Clearances": 2,
+        "Interceptions": 3,
+        "Blocks": 0,
+        "Recovery Rate": 8,
+        "Corners": 4,
+        "Fouls": 2,
+        "Was Fouled": 1,
+        "Yellow Cards": 1,
+        "Red Cards": 0
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleRows, { header: headers });
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Match Performance Data");
+    
+    XLSX.writeFile(workbook, "Match_Performance_Template.xlsx");
+  }
+
+  static downloadMatchTemplate(): void {
+    ExcelUtils.downloadMatchPerformanceTemplate();
+  }
+
+  static downloadFixtureMatchTemplate(): void {
+    ExcelUtils.downloadMatchPerformanceTemplate();
+  }
+
+  // Download player roster import excel template (4 Divisions Multi-Sheet: Our_Team_Roster_Template.xlsx)
+  static downloadPlayerRosterTemplate(): void {
+    const headers = [
+      "Full Name",
+      "Player ID",
+      "Primary Position",
+      "Preferred Foot",
+      "Nationality"
+    ];
+
+    const premierRows = [
+      { "Full Name": "Liam Davies", "Player ID": "CTFC-101", "Primary Position": "CF", "Preferred Foot": "Right", "Nationality": "Wales" },
+      { "Full Name": "Gethin Vaughan", "Player ID": "CTFC-102", "Primary Position": "CM", "Preferred Foot": "Left", "Nationality": "Wales" },
+      { "Full Name": "Rhys Morgan", "Player ID": "CTFC-103", "Primary Position": "CB", "Preferred Foot": "Right", "Nationality": "Wales" },
+      { "Full Name": "Osian Griffiths", "Player ID": "CTFC-104", "Primary Position": "GK", "Preferred Foot": "Right", "Nationality": "Wales" }
+    ];
+
+    const firstRows = [
+      { "Full Name": "Dylan Evans", "Player ID": "CTFC-201", "Primary Position": "LW", "Preferred Foot": "Left", "Nationality": "Wales" },
+      { "Full Name": "Iwan Thomas", "Player ID": "CTFC-202", "Primary Position": "RW", "Preferred Foot": "Right", "Nationality": "Wales" },
+      { "Full Name": "Cai Hughes", "Player ID": "CTFC-203", "Primary Position": "LB", "Preferred Foot": "Left", "Nationality": "Wales" },
+      { "Full Name": "Harri Jones", "Player ID": "CTFC-204", "Primary Position": "RB", "Preferred Foot": "Right", "Nationality": "Wales" }
+    ];
+
+    const reservePremierRows = [
+      { "Full Name": "Jac Roberts", "Player ID": "CTFC-301", "Primary Position": "CAM", "Preferred Foot": "Right", "Nationality": "Wales" },
+      { "Full Name": "Macsen Lewis", "Player ID": "CTFC-302", "Primary Position": "CDM", "Preferred Foot": "Right", "Nationality": "Wales" },
+      { "Full Name": "Tomos Williams", "Player ID": "CTFC-303", "Primary Position": "CB", "Preferred Foot": "Left", "Nationality": "Wales" }
+    ];
+
+    const reserveFirstRows = [
+      { "Full Name": "Elis Bowen", "Player ID": "CTFC-401", "Primary Position": "ST", "Preferred Foot": "Right", "Nationality": "Wales" },
+      { "Full Name": "Steffan Owen", "Player ID": "CTFC-402", "Primary Position": "CM", "Preferred Foot": "Right", "Nationality": "Wales" },
+      { "Full Name": "Emyr Jenkins", "Player ID": "CTFC-403", "Primary Position": "GK", "Preferred Foot": "Right", "Nationality": "Wales" }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+
+    const premierWS = XLSX.utils.json_to_sheet(premierRows, { header: headers });
+    const firstWS = XLSX.utils.json_to_sheet(firstRows, { header: headers });
+    const resPremierWS = XLSX.utils.json_to_sheet(reservePremierRows, { header: headers });
+    const resFirstWS = XLSX.utils.json_to_sheet(reserveFirstRows, { header: headers });
+
+    XLSX.utils.book_append_sheet(workbook, premierWS, "CCFL Premier");
+    XLSX.utils.book_append_sheet(workbook, firstWS, "CCFL First");
+    XLSX.utils.book_append_sheet(workbook, resPremierWS, "Reserve Premier");
+    XLSX.utils.book_append_sheet(workbook, resFirstWS, "Reserve First");
+    
+    XLSX.writeFile(workbook, "Our_Team_Roster_Template.xlsx");
+  }
+
+  static downloadPlayerTemplate(): void {
+    ExcelUtils.downloadPlayerRosterTemplate();
+  }
+
+  // Parse Match Data spreadsheet dynamically determining team orientation
+  static parseMatchExcel(file: File): Promise<ExcelParseResult<MatchData>> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: "array" });
+          const sheetName = ExcelUtils.findOptimalSheet(workbook, "Match Date") || workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const headerRowIndex = ExcelUtils.findHeaderRowIndex(sheet, "Match Date");
+          const json: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, { range: headerRowIndex });
+          
+          const validRecords: MatchData[] = [];
+          const errorDetails: string[] = [];
+          let errorRowsCount = 0;
+
+          for (let index = 0; index < json.length; index++) {
+            const row = json[index];
+            const rowNum = index + 2;
+
+            // Find Date, Team Name, Opponent (Mandatory)
+            let dateVal = "";
+            let teamNameVal = "";
+            let opponentVal = "";
+            let competitionVal = "League";
+            let venueVal = "Home";
+            let resultVal = "W (1-0)";
+
+            // Look directly in row fields by standard English names
+            for (const [header, key] of Object.entries(MATCH_HEADERS_MAP)) {
+              if (row[header] !== undefined) {
+                const sVal = String(row[header]).trim();
+                if (key === "date") dateVal = sVal;
+                if (key === "teamName") teamNameVal = sVal;
+                if (key === "opponent") opponentVal = sVal;
+                if (key === "competition") competitionVal = sVal;
+                if (key === "venue") venueVal = sVal;
+                if (key === "result") resultVal = sVal;
+              }
+            }
+
+            // Fallback for older headers
+            if (!teamNameVal && row["Team"] !== undefined) {
+              teamNameVal = String(row["Team"]).trim();
+            }
+
+            if (!dateVal) {
+              errorDetails.push(`Row ${rowNum}: Required field [Match Date] is missing.`);
+              errorRowsCount++;
+              continue;
+            }
+
+            // Decide team orientation
+            let isOpp = true;
+            const normalizedTeamName = teamNameVal.toLowerCase();
+            if (!teamNameVal || normalizedTeamName.includes("cardiff town") || normalizedTeamName === "us" || normalizedTeamName === "our") {
+              isOpp = false;
+            }
+
+            // Resolve opponent name
+            let finalOpponent = opponentVal;
+            if (isOpp) {
+              // For opponent rows, the teamNameVal represents the analyzed opponent team, while our team is the actual opponent in that row!
+              finalOpponent = teamNameVal || "Opponent";
+            } else if (!finalOpponent) {
+              finalOpponent = "Unknown Opponent";
+            }
+
+            // Create match object
+            const record: MatchData = {
+              id: "",
+              date: dateVal,
+              competition: competitionVal,
+              opponent: finalOpponent,
+              venue: venueVal,
+              result: resultVal,
+              isOpponentTeam: isOpp,
+              
+              // Standard PI counters
+              shots: 0,
+              shotsOnTarget: 0,
+              goals: 0,
+              corners: 0,
+            };
+
+            // Map standard and custom PI numeric fields
+            for (const [header, key] of Object.entries(MATCH_HEADERS_MAP)) {
+              if (row[header] !== undefined) {
+                const numVal = Number(row[header]);
+                if (!isNaN(numVal) && key !== "date" && key !== "opponent" && key !== "competition" && key !== "venue" && key !== "result" && key !== "teamName") {
+                  (record as any)[key] = numVal;
+                }
+              }
+            }
+
+            // Re-derive general standard stats from specific Hudl Sportscode stats if they are present but parent is empty
+            if (record.shotOnTarget !== undefined && !record.shotsOnTarget) {
+              record.shotsOnTarget = record.shotOnTarget;
+            }
+            if (record.shotOnTarget !== undefined && record.shotOffTarget !== undefined && record.shotBlocked !== undefined) {
+              record.shots = record.shotOnTarget + record.shotOffTarget + record.shotBlocked + record.goals;
+            }
+            if (record.backwardPasses !== undefined && record.forwardPasses !== undefined && record.sidewaysPasses !== undefined) {
+              record.totalPasses = record.backwardPasses + record.forwardPasses + record.sidewaysPasses + (record.crosses || 0) + (record.throughBalls || 0);
+            }
+            if (record.failedPass !== undefined && record.totalPasses) {
+              record.successfulPasses = Math.max(0, record.totalPasses - record.failedPass);
+            }
+            if (record.tackle !== undefined) {
+              record.tacklesAttempted = record.tackle + (record.dribbledPast || 0);
+              record.tacklesWon = record.tackle;
+            }
+            if (record.ballRecovery !== undefined) {
+              record.ballRecoveries = record.ballRecovery;
+            }
+            if (record.penaltyAreaEntry !== undefined) {
+              record.boxEntries = record.penaltyAreaEntry;
+            }
+
+            // Validation Checks
+            const rowErrors: string[] = [];
+            
+            // Negative values check
+            for (const [k, v] of Object.entries(record)) {
+              if (typeof v === "number" && v < 0) {
+                rowErrors.push(`${k} cannot be a negative value (${v})`);
+              }
+            }
+
+            if (rowErrors.length > 0) {
+              errorDetails.push(`[Row ${rowNum} - Team: ${teamNameVal || "Cardiff Town FC"}] ${rowErrors.join(" | ")}`);
+              errorRowsCount++;
+            } else {
+              validRecords.push(record);
+            }
+          }
+
+          resolve({
+            validRecords,
+            totalRows: json.length,
+            errorRows: errorRowsCount,
+            errorDetails
+          });
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  // Parse Player Data spreadsheet with Multi-Sheet 4 Division support
+  static parsePlayerExcel(file: File, options?: { teamName?: string; teamId?: string }): Promise<ExcelParseResult<Player>> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: "array" });
+          
+          const validRecords: Player[] = [];
+          const errorDetails: string[] = [];
+          let errorRowsCount = 0;
+          let totalRowsCount = 0;
+
+          // Parse all sheets (e.g. CCFL Premier, CCFL First, Reserve Premier, Reserve First)
+          for (const sheetName of workbook.SheetNames) {
+            const sheet = workbook.Sheets[sheetName];
+            if (!sheet || !sheet['!ref']) continue;
+
+            let division = sheetName.trim();
+            if (sheetName.toLowerCase().includes("premier") && sheetName.toLowerCase().includes("reserve")) {
+              division = "Reserve Premier";
+            } else if (sheetName.toLowerCase().includes("first") && sheetName.toLowerCase().includes("reserve")) {
+              division = "Reserve First";
+            } else if (sheetName.toLowerCase().includes("premier")) {
+              division = "CCFL Premier";
+            } else if (sheetName.toLowerCase().includes("first")) {
+              division = "CCFL First";
+            }
+
+            const headerRowIndex = ExcelUtils.findHeaderRowIndex(sheet, "Player Name") ?? ExcelUtils.findHeaderRowIndex(sheet, "Full Name") ?? 0;
+            const json: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, { range: headerRowIndex });
+            totalRowsCount += json.length;
+
+            for (let index = 0; index < json.length; index++) {
+              const row = json[index];
+              const rowNum = index + 2;
+
+              let nameVal = "";
+              let playerIdVal = "";
+              let dobVal = "";
+              let backNumberVal = 0;
+              let posVal: any = "ST";
+              let joinDateVal = "";
+              let nationalityVal = "Wales";
+              let preferredFootVal = "Right";
+
+              // Map row fields by keys
+              for (const [header, key] of Object.entries(PLAYER_HEADERS_MAP)) {
+                const rowVal = ExcelUtils.findRowValue(row, header);
+                if (rowVal !== undefined) {
+                  if (key === "name") nameVal = String(rowVal).trim();
+                  if (key === "dob") dobVal = String(rowVal).trim();
+                  if (key === "backNumber") {
+                    playerIdVal = String(rowVal).trim();
+                    backNumberVal = parseInt(String(rowVal).replace(/\D/g, "")) || 0;
+                  }
+                  if (key === "position") posVal = String(rowVal).trim();
+                  if (key === "joinDate") joinDateVal = String(rowVal).trim();
+                  if (key === "nationality") nationalityVal = String(rowVal).trim();
+                  if (key === "preferredFoot") preferredFootVal = String(rowVal).trim();
+                }
+              }
+
+              if (!nameVal) {
+                errorDetails.push(`Sheet [${sheetName}] Row ${rowNum}: Required column [Player Name / Full Name] is missing.`);
+                errorRowsCount++;
+                continue;
+              }
+
+              const pId = playerIdVal || `P-${Math.floor(100 + Math.random() * 900)}`;
+
+              const player: Player = {
+                id: pId,
+                name: nameVal,
+                dob: dobVal || "2000-01-01",
+                joinDate: joinDateVal || "2026-08-01",
+                backNumber: backNumberVal || (parseInt(pId.replace(/\D/g, "")) || 10),
+                position: posVal,
+                nationality: nationalityVal || "Wales",
+                preferredFoot: preferredFootVal || "Right",
+                division: division,
+                teamName: options?.teamName || "Cardiff Town FC",
+                teamId: options?.teamId || "ctfc",
+                totalPasses: 0,
+                successfulPasses: 0,
+                progressivePasses: 0,
+                successfulProgressivePasses: 0,
+                finalThirdPasses: 0,
+                keyPasses: 0,
+                throughBalls: 0,
+                successfulThroughBalls: 0,
+                shots: 0,
+                shotsOnTarget: 0,
+                goals: 0,
+                assists: 0,
+                chancesCreated: 0,
+                touches: 0,
+                progressiveCarries: 0,
+                progressiveDribbles: 0,
+                aerialDuels: 0,
+                aerialDuelsWon: 0,
+                defensiveDuels: 0,
+                defensiveDuelsWon: 0,
+                tacklesAttempted: 0,
+                tacklesWon: 0,
+                interceptions: 0,
+                clearances: 0,
+                ballRecoveries: 0,
+                possessionRegains: 0,
+                dribblesAttempted: 0,
+                successfulDribbles: 0,
+                crossesAttempted: 0,
+                successfulCrosses: 0,
+                boxEntries: 0,
+                saveAttempts: 0,
+                saves: 0,
+                crossClaims: 0,
+                sweeperActions: 0,
+                minutesPlayed: 0,
+                cleanSheets: 0,
+              };
+
+              // Map numeric fields
+              for (const [header, key] of Object.entries(PLAYER_HEADERS_MAP)) {
+                const rowVal = ExcelUtils.findRowValue(row, header);
+                if (rowVal !== undefined) {
+                  const numVal = Number(rowVal);
+                  if (!isNaN(numVal) && key !== "name" && key !== "dob" && key !== "backNumber" && key !== "position") {
+                    (player as any)[key] = numVal;
+                  }
+                }
+              }
+
+              validRecords.push(player);
+            }
+          }
+
+          resolve({
+            validRecords,
+            totalRows: totalRowsCount,
+            errorRows: errorRowsCount,
+            errorDetails
+          });
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  // Parse Player Match-by-Match Data spreadsheet
+  static async parsePlayerMatchExcel(file: File): Promise<ExcelParseResult<any>> {
+    const { data: profiles } = await (supabase.from('profiles') as any).select('player_id, full_name, username, id, user_id');
+    const profileMap = new Map<string, string>();
+    if (profiles && Array.isArray(profiles)) {
+      profiles.forEach((p: any) => {
+        const pid = p.player_id || p.id || p.user_id;
+        if (!pid) return;
+        if (p.full_name) profileMap.set(p.full_name.trim().toLowerCase(), pid);
+        if (p.username) profileMap.set(p.username.trim().toLowerCase(), pid);
+      });
+    }
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: "array" });
+          const sheetName = ExcelUtils.findOptimalSheet(workbook, "Player Name") || workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const headerRowIndex = ExcelUtils.findHeaderRowIndex(sheet, "Player Name");
+          const json: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, { range: headerRowIndex });
+          
+          const validRecords: any[] = [];
+          const errorDetails: string[] = [];
+          let errorRowsCount = 0;
+
+          for (let index = 0; index < json.length; index++) {
+            const row = json[index];
+            const rowNum = index + 2;
+
+            let matchIdVal = "";
+            let teamIdVal = "";
+            let playerIdVal = "";
+            let playerNameVal = "";
+            let shirtNumberVal = 0;
+            let positionVal = "ST";
+
+            // Map custom identifiers
+            const matchIdRowVal = ExcelUtils.findMatchIdentifierValue(row, "Match ID");
+            const teamIdRowVal = ExcelUtils.findMatchIdentifierValue(row, "Team ID");
+            const playerIdRowVal = ExcelUtils.findMatchIdentifierValue(row, "Player ID");
+            const playerNameRowVal = ExcelUtils.findMatchIdentifierValue(row, "Player Name") || ExcelUtils.findMatchIdentifierValue(row, "Full Name");
+            const shirtNumberRowVal = ExcelUtils.findMatchIdentifierValue(row, "Shirt Number");
+            const positionRowVal = ExcelUtils.findMatchIdentifierValue(row, "Position") || ExcelUtils.findMatchIdentifierValue(row, "Primary Position");
+
+            if (matchIdRowVal !== undefined) matchIdVal = String(matchIdRowVal).trim();
+            if (teamIdRowVal !== undefined) teamIdVal = String(teamIdRowVal).trim();
+            if (playerIdRowVal !== undefined) playerIdVal = String(playerIdRowVal).trim();
+            if (playerNameRowVal !== undefined) playerNameVal = String(playerNameRowVal).trim();
+            if (shirtNumberRowVal !== undefined) shirtNumberVal = Number(shirtNumberRowVal);
+            if (positionRowVal !== undefined) positionVal = String(positionRowVal).trim();
+
+            if (!matchIdVal) matchIdVal = "M01";
+            if (!teamIdVal) teamIdVal = "ctfc";
+
+            if (!playerNameVal && !playerIdVal) {
+              errorDetails.push(`Row ${rowNum}: Required column [Player Name] or [Player ID] is missing.`);
+              errorRowsCount++;
+              continue;
+            }
+
+            const resolvedPlayerId = profileMap.get(playerNameVal.trim().toLowerCase()) || playerIdVal || (shirtNumberVal ? String(shirtNumberVal) : playerNameVal.toLowerCase().replace(/\s+/g, "_"));
+
+            const record: any = {
+              matchId: matchIdVal,
+              teamId: teamIdVal,
+              playerId: resolvedPlayerId,
+              playerName: playerNameVal || playerIdVal || "Unknown",
+              shirtNumber: shirtNumberVal,
+              position: positionVal,
+              goals: 0,
+              assists: 0,
+              shots: 0,
+              shotsOnTarget: 0,
+              totalPasses: 0,
+              successfulPasses: 0,
+              keyPasses: 0,
+              throughBalls: 0,
+              touches: 0,
+              tacklesAttempted: 0,
+              tacklesWon: 0,
+              interceptions: 0,
+              clearances: 0,
+              ballRecoveries: 0,
+              dribblesAttempted: 0,
+              successfulDribbles: 0,
+              crossesAttempted: 0,
+              successfulCrosses: 0,
+              minutesPlayed: 0
+            };
+
+            // Map standard and custom player numeric fields
+            for (const [header, key] of Object.entries(PLAYER_HEADERS_MAP)) {
+              const rowVal = ExcelUtils.findRowValue(row, header);
+              if (rowVal !== undefined) {
+                let cleanVal = rowVal;
+                if (typeof cleanVal === "string") {
+                  cleanVal = cleanVal.replace("%", "").trim();
+                }
+                const numVal = Number(cleanVal);
+                if (!isNaN(numVal) && key !== "name" && key !== "dob" && key !== "backNumber" && key !== "position") {
+                  record[key] = numVal;
+                }
+              }
+            }
+
+            const rowErrors: string[] = [];
+            for (const [k, v] of Object.entries(record)) {
+              if (typeof v === "number" && v < 0) {
+                rowErrors.push(`${k} cannot be a negative value (${v})`);
+              }
+            }
+
+            if (rowErrors.length > 0) {
+              errorDetails.push(`[Row ${rowNum} - Team: ${teamIdVal}, Player: ${playerNameVal || playerIdVal}] ${rowErrors.join(" | ")}`);
+              errorRowsCount++;
+            } else {
+              validRecords.push(record);
+            }
+          }
+
+          resolve({
+            validRecords,
+            totalRows: json.length,
+            errorRows: errorRowsCount,
+            errorDetails
+          });
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  // Download Heatmap Data Template spreadsheet
+  static downloadHeatmapTemplate(): void {
+    const headers = [
+      "Match ID",
+      "Team ID",
+      "Player ID",
+      "Start X",
+      "Start Y",
+      "End X",
+      "End Y",
+      "Type"
+    ];
+
+    const sampleRows: any[] = [
+      {
+        "Match ID": "M01",
+        "Team ID": "ctfc",
+        "Player ID": "ST01",
+        "Start X": 20,
+        "Start Y": 15,
+        "End X": 35,
+        "End Y": 20,
+        "Type": "Pass"
+      },
+      {
+        "Match ID": "M01",
+        "Team ID": "ctfc",
+        "Player ID": "CM01",
+        "Start X": 30,
+        "Start Y": 30,
+        "End X": 30,
+        "End Y": 30,
+        "Type": "Activity"
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleRows, { header: headers });
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Heatmap Data");
+    
+    XLSX.writeFile(workbook, "heatmap_coordinates_template.xlsx");
+  }
+
+  // Parse Heatmap XY Coordinates spreadsheet
+  static parseHeatmapExcel(file: File): Promise<ExcelParseResult<any>> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: "array" });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const json: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet);
+          
+          const validRecords: any[] = [];
+          const errorDetails: string[] = [];
+          let errorRowsCount = 0;
+
+          for (let index = 0; index < json.length; index++) {
+            const row = json[index];
+            const rowNum = index + 2;
+
+            let matchIdVal = "";
+            let teamIdVal = "";
+            let playerIdVal = "";
+            let startXVal = 0;
+            let startYVal = 0;
+            let endXVal = 0;
+            let endYVal = 0;
+            let typeVal = "Activity";
+
+            // Map keys
+            for (const [key, val] of Object.entries(row)) {
+              const lowerKey = key.toLowerCase().replace(/[\s_-]/g, "");
+              if (lowerKey === "matchid") matchIdVal = String(val).trim();
+              else if (lowerKey === "teamid") teamIdVal = String(val).trim();
+              else if (lowerKey === "playerid") playerIdVal = String(val).trim();
+              else if (lowerKey === "startx") startXVal = Number(val);
+              else if (lowerKey === "starty") startYVal = Number(val);
+              else if (lowerKey === "endx") endXVal = Number(val);
+              else if (lowerKey === "endy") endYVal = Number(val);
+              else if (lowerKey === "type") typeVal = String(val).trim();
+            }
+
+            if (!matchIdVal || !teamIdVal || !playerIdVal) {
+              errorDetails.push(`Row ${rowNum}: Required column [Match ID], [Team ID], or [Player ID] is missing.`);
+              errorRowsCount++;
+              continue;
+            }
+
+            if (isNaN(startXVal) || isNaN(startYVal) || isNaN(endXVal) || isNaN(endYVal)) {
+              errorDetails.push(`Row ${rowNum}: Coordinates must be numeric values.`);
+              errorRowsCount++;
+              continue;
+            }
+
+            // Normalise coordinates to 0-60 range if they are out of bounds
+            const clamp60 = (val: number) => Math.max(0, Math.min(60, val));
+
+            const record = {
+              matchId: matchIdVal,
+              teamId: teamIdVal,
+              playerId: playerIdVal,
+              startX: clamp60(startXVal),
+              startY: clamp60(startYVal),
+              endX: clamp60(endXVal),
+              endY: clamp60(endYVal),
+              type: typeVal || "Activity"
+            };
+
+            validRecords.push(record);
+          }
+
+          resolve({
+            validRecords,
+            totalRows: json.length,
+            errorRows: errorRowsCount,
+            errorDetails
+          });
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  // Parse Teams Data spreadsheet
+  static parseTeamsExcel(file: File): Promise<CustomTeam[]> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: "array" });
+          const parsedTeams: CustomTeam[] = [];
+
+          for (const sheetName of workbook.SheetNames) {
+            const sheet = workbook.Sheets[sheetName];
+            if (!sheet || !sheet['!ref']) continue;
+
+            // Determine league based on sheet name
+            let league = "CCFL Third Division";
+            const lowerSheetName = sheetName.toLowerCase();
+            if (lowerSheetName.includes("premier")) {
+              league = "CCFL Premier Division";
+            } else if (lowerSheetName.includes("first")) {
+              league = "CCFL First Division";
+            } else if (lowerSheetName.includes("second")) {
+              league = "CCFL Second Division";
+            } else if (lowerSheetName.includes("third")) {
+              league = "CCFL Third Division";
+            }
+
+            const json: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet);
+            
+            // Loop through rows to find Team ID and Team Name
+            for (const row of json) {
+              let rawId = "";
+              let rawName = "";
+              let rowLeague = league;
+
+              // Search for key match aliases
+              for (const [key, val] of Object.entries(row)) {
+                const lowerKey = key.toLowerCase().replace(/\s+/g, "");
+                const strVal = String(val || "").trim();
+                if (!strVal) continue;
+
+                if (["teamid", "id", "팀id", "팀코드", "코드", "code"].includes(lowerKey)) {
+                  rawId = strVal;
+                } else if (["teamname", "name", "팀이름", "팀명", "이름"].includes(lowerKey)) {
+                  rawName = strVal;
+                } else if (["league", "division", "리그", "디비전", "구분"].includes(lowerKey)) {
+                  if (strVal.toLowerCase().includes("premier")) rowLeague = "CCFL Premier Division";
+                  else if (strVal.toLowerCase().includes("first")) rowLeague = "CCFL First Division";
+                  else if (strVal.toLowerCase().includes("second")) rowLeague = "CCFL Second Division";
+                  else if (strVal.toLowerCase().includes("third")) rowLeague = "CCFL Third Division";
+                }
+              }
+
+              if (rawId && rawName) {
+                parsedTeams.push({
+                  id: rawId.toLowerCase().trim(),
+                  name: rawName.trim(),
+                  league: rowLeague,
+                  mp: 0,
+                  w: 0,
+                  d: 0,
+                  l: 0,
+                  gf: 0,
+                  ga: 0
+                });
+              }
+            }
+          }
+
+          resolve(parsedTeams);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  // Download League Teams Template (League_Teams_Template.xlsx)
+  static downloadLeagueTeamsTemplate(): void {
+    const headers = [
+      "Team Name (Mandatory)",
+      "Short Name (Optional)",
+      "Division (Optional)",
+      "Home Venue (Optional)"
+    ];
+
+    const sampleRows = [
+      {
+        "Team Name (Mandatory)": "Cardiff Town FC",
+        "Short Name (Optional)": "CTFC",
+        "Division (Optional)": "Premier Division",
+        "Home Venue (Optional)": "Cardiff Sports Village"
+      },
+      {
+        "Team Name (Mandatory)": "AFC Roath",
+        "Short Name (Optional)": "AFCR",
+        "Division (Optional)": "Division 1",
+        "Home Venue (Optional)": "Roath Park"
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleRows, { header: headers });
+    worksheet['!cols'] = [
+      { wch: 30 },
+      { wch: 22 },
+      { wch: 22 },
+      { wch: 30 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "League Teams");
+
+    XLSX.writeFile(workbook, "League_Teams_Template.xlsx");
+  }
+
+  static downloadTeamsTemplate(): void {
+    ExcelUtils.downloadLeagueTeamsTemplate();
+  }
+
+  // Download Team Registration Template specifically for registering teams
+  static downloadTeamRegistrationTemplate(): void {
+    ExcelUtils.downloadLeagueTeamsTemplate();
+  }
+
+  // Parse Team Registration spreadsheet and validate required fields (ONLY Team Name is mandatory)
+  static parseTeamRegistrationExcel(file: File): Promise<TeamRegistrationParseResult> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: "array" });
+          const validRecords: ParsedTeamRegistrationRow[] = [];
+          const errorDetails: string[] = [];
+          let errorRowsCount = 0;
+          let totalRowsCount = 0;
+
+          // Search for sheet named "Teams" or fallback to first sheet
+          const sheetName = workbook.SheetNames.find(s => s.toLowerCase().trim() === "teams") || workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+
+          if (sheet && sheet['!ref']) {
+            const json: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet);
+            totalRowsCount = json.length;
+
+            for (let i = 0; i < json.length; i++) {
+              const row = json[i];
+              const rowNum = i + 2;
+
+              let teamIdVal = "";
+              let teamNameVal = "";
+              let divisionVal = "";
+              let homeVenueVal = "";
+              let shortCodeVal = "";
+
+              for (const [key, val] of Object.entries(row)) {
+                const lowerKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+                const strVal = String(val || "").trim();
+                if (!strVal) continue;
+
+                if (["teamidoptional", "teamid", "id", "teamcode", "code"].includes(lowerKey)) {
+                  teamIdVal = strVal;
+                } else if (["teamnamemandatory", "teamname", "name", "clubname"].includes(lowerKey)) {
+                  teamNameVal = strVal;
+                } else if (["divisionoptional", "division", "league", "tier"].includes(lowerKey)) {
+                  divisionVal = strVal;
+                } else if (["homevenueoptional", "homevenue", "venue", "stadium", "ground"].includes(lowerKey)) {
+                  homeVenueVal = strVal;
+                } else if (["shortnameoptional", "shortnamecode", "shortname", "code", "shortcode", "abbr"].includes(lowerKey)) {
+                  shortCodeVal = strVal;
+                }
+              }
+
+              // Extract row entries and validate that ONLY Team Name is present
+              if (!teamNameVal) {
+                errorDetails.push(`Row ${rowNum}: Required column [Team Name] is missing.`);
+                errorRowsCount++;
+                continue;
+              }
+
+              const generatedUuid = crypto.randomUUID();
+              let resolvedId = teamIdVal;
+              let resolvedShortCode = shortCodeVal;
+
+              if (!resolvedId) {
+                resolvedId = generatedUuid;
+              } else if (!resolvedShortCode && resolvedId.length <= 8 && !resolvedId.includes('-')) {
+                resolvedShortCode = resolvedId;
+                resolvedId = generatedUuid;
+              }
+
+              validRecords.push({
+                id: resolvedId,
+                team_id: resolvedId,
+                team_name: teamNameVal,
+                division: divisionVal || "Premier Division",
+                home_venue: homeVenueVal || undefined,
+                short_code: resolvedShortCode || undefined,
+                created_at: new Date().toISOString()
+              });
+            }
+          }
+
+          resolve({
+            validRecords,
+            totalRows: totalRowsCount,
+            errorRows: errorRowsCount,
+            errorDetails
+          });
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsArrayBuffer(file);
+    });
+  }
+}
