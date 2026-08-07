@@ -30,7 +30,7 @@ export default function ExcelTemplates({ currentUser, onRefreshData }: ExcelTemp
     {
       id: "match-fixtures-template",
       title: "Match Fixtures Template",
-      description: "Batch upload template for match schedules, scores, team possession, and fixture stats. Headers: match_id, date, opponent, home_away, our_score, opponent_score, possession, total_shots, shots_on_target, corners, fouls, yellow_cards, red_cards, status.",
+      description: "Batch upload template for detailed match stats. Headers: match_id, date, opponent, home_away, our_score, opponent_score, status, goals, shots, shots_on_target, passes, successful_passes, backwards_passes, forwards_passes, long_passes, successful_long_passes, key_passes, successful_key_passes, through_balls, successful_through_balls, crosses, successful_crosses, dribbles, successful_dribbles, duels, duels_won, aerial_duels, aerial_duels_won, ground_duels, ground_duels_won, ball_recoveries, tackles, tackles_won, interceptions, clearances, blocks, own_goals, turnovers, miscontrols, unsuccessful_dribbles, possession_lost, offsides, fouls, yellow_cards, red_cards. NO percentage (%) columns.",
       filename: "Match_Fixtures_Template.xlsx",
       icon: Calendar,
       action: () => ExcelUtils.downloadMatchFixturesTemplate(),
