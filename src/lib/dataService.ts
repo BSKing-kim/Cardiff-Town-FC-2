@@ -1663,16 +1663,19 @@ export class DataService {
   }
 
   static async login(username: string, passwordPlain: string): Promise<UserProfile> {
-    const trimmedUsername = (username || "").trim();
+    const cleanUsername = (username || "").trim().toLowerCase();
+    if (!cleanUsername) {
+      throw new Error("Please enter a username.");
+    }
 
     // 1. Master Admin bypass
-    if (trimmedUsername.toLowerCase() === DEFAULT_ADMIN.username.toLowerCase() && passwordPlain === DEFAULT_ADMIN.passwordHash) {
+    if (cleanUsername === DEFAULT_ADMIN.username.toLowerCase() && passwordPlain === DEFAULT_ADMIN.passwordHash) {
       localStorage.setItem(CURRENT_USER_LS_KEY, JSON.stringify(DEFAULT_ADMIN));
       return DEFAULT_ADMIN;
     }
 
     // 2. Verify credentials with Supabase Auth
-    const userEmail = trimmedUsername.includes('@') ? trimmedUsername : `${trimmedUsername.toLowerCase()}@ctfc.club`;
+    const userEmail = cleanUsername.includes('@') ? cleanUsername : `${cleanUsername}@ctfc.club`;
     let authUser: any = null;
 
     try {
@@ -1714,7 +1717,7 @@ export class DataService {
       if (!profileData) {
         const { data: pUnameData } = await (supabase.from('profiles') as any)
           .select('id, user_id, player_id, full_name, username, role, status, position, preferred_foot, nationality, squad_number, is_onboarded, onboarding_completed')
-          .ilike('username', trimmedUsername)
+          .ilike('username', cleanUsername)
           .maybeSingle();
 
         if (pUnameData) profileData = pUnameData;
@@ -1725,9 +1728,9 @@ export class DataService {
 
     // 4. Local User Fallback
     const users = await this.getUsers();
-    const localUser = users.find(u => u.username.toLowerCase() === trimmedUsername.toLowerCase());
+    const localUser = users.find(u => u.username.toLowerCase() === cleanUsername);
 
-    if (!authUser && !localUser) {
+    if (!authUser && !localUser && !profileData) {
       throw new Error("This username does not exist.");
     }
 
@@ -1739,7 +1742,7 @@ export class DataService {
     const statusVal = profileData?.status || localUser?.status || (localUser?.approved === false ? "pending" : "approved");
     const statusStr = String(statusVal).trim().toLowerCase();
 
-    const isApproved = statusStr === "approved" || trimmedUsername.toLowerCase() === DEFAULT_ADMIN.username.toLowerCase();
+    const isApproved = statusStr === "approved" || cleanUsername === DEFAULT_ADMIN.username.toLowerCase();
 
     if (!isApproved) {
       // Immediately log out from Supabase Auth
@@ -1757,16 +1760,17 @@ export class DataService {
     }
 
     // 6. User is approved -> construct profile object & complete login
-    const nameParts = (profileData?.full_name || (localUser?.firstName ? `${localUser.firstName} ${localUser.lastName}` : trimmedUsername)).split(" ");
+    const resolvedUsername = profileData?.username || localUser?.username || cleanUsername;
+    const nameParts = (profileData?.full_name || (localUser?.firstName ? `${localUser.firstName} ${localUser.lastName}` : resolvedUsername)).split(" ");
     const userRole = (profileData?.role || localUser?.role || UserRole.Player) as UserRole;
 
     const loggedInProfile: UserProfile = {
-      id: authId || localUser?.id || profileData?.id || profileData?.user_id || `usr_${trimmedUsername}`,
+      id: authId || localUser?.id || profileData?.id || profileData?.user_id || `usr_${resolvedUsername}`,
       user_id: authId || localUser?.user_id || profileData?.user_id,
       player_id: profileData?.player_id || localUser?.player_id,
-      username: profileData?.username || localUser?.username || trimmedUsername,
+      username: resolvedUsername,
       role: userRole,
-      isAdmin: userRole === UserRole.HeadCoach || (localUser ? localUser.isAdmin : false) || trimmedUsername.toLowerCase() === DEFAULT_ADMIN.username.toLowerCase(),
+      isAdmin: userRole === UserRole.HeadCoach || userRole === UserRole.Manager || (localUser ? localUser.isAdmin : false) || resolvedUsername.toLowerCase() === DEFAULT_ADMIN.username.toLowerCase(),
       createdAt: localUser?.createdAt || new Date().toISOString(),
       firstName: localUser?.firstName || nameParts[0] || "",
       lastName: localUser?.lastName || nameParts.slice(1).join(" ") || "",
@@ -1823,9 +1827,10 @@ export class DataService {
     middleName: string, 
     lastName: string
   ): Promise<UserProfile> {
+    const cleanUsername = (username || "").trim().toLowerCase();
     const users = await this.getUsers();
     
-    if (users.some(u => u.username.toLowerCase() === username.toLowerCase()) || username.toLowerCase() === DEFAULT_ADMIN.username.toLowerCase()) {
+    if (users.some(u => u.username.toLowerCase() === cleanUsername) || cleanUsername === DEFAULT_ADMIN.username.toLowerCase()) {
       throw new Error("This username is already taken.");
     }
 
@@ -1837,7 +1842,7 @@ export class DataService {
     }
 
     const fullName = `${firstName} ${lastName}`.trim();
-    const userEmail = username.includes('@') ? username : `${username.toLowerCase()}@ctfc.club`;
+    const userEmail = cleanUsername.includes('@') ? cleanUsername : `${cleanUsername}@ctfc.club`;
 
     // 1. Register user via Supabase Auth
     let authUser: { id: string } | null = null;
@@ -1847,7 +1852,7 @@ export class DataService {
         password: passwordPlain,
         options: {
           data: {
-            username: username,
+            username: cleanUsername,
             full_name: fullName,
             role: role || 'Player',
             position: 'CM'
@@ -1866,14 +1871,14 @@ export class DataService {
     const userId = authUser?.id || "user_" + Math.random().toString(36).substr(2, 9);
     const playerId = `PLR-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
-    // 2. Immediately upsert their profile information into Supabase profiles table with status = 'pending' and onboarding_completed = false
+    // 2. Immediately upsert profile into Supabase profiles table with status = 'pending' and username preserved
     try {
       const profileData = {
         id: userId,
         user_id: userId,
         player_id: playerId,
         full_name: fullName,
-        username: username,
+        username: cleanUsername,
         role: role || 'Player',
         position: null,
         preferred_foot: 'Right',
@@ -1883,10 +1888,13 @@ export class DataService {
         onboarding_completed: false,
         status: 'pending'
       };
-      const { error } = await (supabase.from('profiles') as any).upsert(profileData, { onConflict: 'user_id' });
 
-      if (error) {
-        await (supabase.from('profiles') as any).upsert(profileData, { onConflict: 'username' });
+      const { error: idErr } = await (supabase.from('profiles') as any).upsert(profileData, { onConflict: 'id' });
+      if (idErr) {
+        const { error: userErr } = await (supabase.from('profiles') as any).upsert(profileData, { onConflict: 'user_id' });
+        if (userErr) {
+          await (supabase.from('profiles') as any).upsert(profileData, { onConflict: 'username' });
+        }
       }
 
       // 3. Create player entry in players table
@@ -1910,9 +1918,9 @@ export class DataService {
       user_id: userId,
       player_id: playerId,
       playerId: playerId,
-      username,
-      role: role,
-      isAdmin: (role as string) === "Admin" || role === UserRole.HeadCoach,
+      username: cleanUsername,
+      role: role || 'Player',
+      isAdmin: (role as string) === "Admin" || role === UserRole.HeadCoach || role === UserRole.Manager,
       createdAt: new Date().toISOString(),
       passwordHash: passwordPlain,
       firstName,
@@ -1926,12 +1934,25 @@ export class DataService {
     };
 
     users.push(newUser);
-    await this.saveUsers(users);
+    localStorage.setItem(USERS_LS_KEY, JSON.stringify(users));
 
-    await this.applyForRole(newUser.id, newUser.username, role, "Join");
+    try {
+      const app = {
+        id: "app_" + Math.random().toString(36).substr(2, 9),
+        userId: userId,
+        username: cleanUsername,
+        requestedRole: role || 'Player',
+        rolePreference: role || 'Player',
+        status: "pending",
+        createdAt: new Date().toISOString(),
+        fullName: fullName
+      };
+      await (supabase.from("applications") as any).upsert(app, { onConflict: "id" });
+    } catch (appErr) {
+      console.warn("Exception creating role application record:", appErr);
+    }
 
-    const { passwordHash, ...profile } = newUser;
-    return profile;
+    return newUser;
   }
 
   static async changePassword(userId: string, prevPassword: string, newPassword: string): Promise<void> {
