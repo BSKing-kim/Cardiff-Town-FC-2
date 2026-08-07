@@ -1945,7 +1945,7 @@ export class DataService {
       console.warn("Supabase auth.signUp exception:", e);
     }
 
-    const userId = authUser?.id || "user_" + Math.random().toString(36).substr(2, 9);
+    const userId = authUser?.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : '00000000-0000-4000-a000-000000000000');
 
     // 3. Save profile strictly in public.profiles table ONLY
     try {
