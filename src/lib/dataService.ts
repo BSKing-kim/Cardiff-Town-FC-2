@@ -1647,29 +1647,126 @@ export class DataService {
   }
 
   static async login(username: string, passwordPlain: string): Promise<UserProfile> {
-    if (username === DEFAULT_ADMIN.username && passwordPlain === DEFAULT_ADMIN.passwordHash) {
+    const trimmedUsername = (username || "").trim();
+
+    // 1. Master Admin bypass
+    if (trimmedUsername.toLowerCase() === DEFAULT_ADMIN.username.toLowerCase() && passwordPlain === DEFAULT_ADMIN.passwordHash) {
       localStorage.setItem(CURRENT_USER_LS_KEY, JSON.stringify(DEFAULT_ADMIN));
       return DEFAULT_ADMIN;
     }
 
-    const users = await this.getUsers();
-    const user = users.find(u => u.username === username);
+    // 2. Verify credentials with Supabase Auth
+    const userEmail = trimmedUsername.includes('@') ? trimmedUsername : `${trimmedUsername.toLowerCase()}@ctfc.club`;
+    let authUser: any = null;
 
-    if (!user) {
+    try {
+      const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
+        email: userEmail,
+        password: passwordPlain
+      });
+
+      if (!authErr && authData?.user) {
+        authUser = authData.user;
+      }
+    } catch (e) {
+      console.warn("Supabase Auth signInWithPassword exception:", e);
+    }
+
+    // 3. Query profiles table from Supabase for approval status and role
+    let profileData: any = null;
+    const authId = authUser?.id;
+
+    try {
+      if (authId) {
+        const { data: pData } = await (supabase.from('profiles') as any)
+          .select('id, user_id, player_id, full_name, username, role, status, position, preferred_foot, nationality, squad_number, is_onboarded, onboarding_completed')
+          .eq('id', authId)
+          .maybeSingle();
+
+        if (pData) {
+          profileData = pData;
+        } else {
+          const { data: pUserData } = await (supabase.from('profiles') as any)
+            .select('id, user_id, player_id, full_name, username, role, status, position, preferred_foot, nationality, squad_number, is_onboarded, onboarding_completed')
+            .eq('user_id', authId)
+            .maybeSingle();
+
+          if (pUserData) profileData = pUserData;
+        }
+      }
+
+      if (!profileData) {
+        const { data: pUnameData } = await (supabase.from('profiles') as any)
+          .select('id, user_id, player_id, full_name, username, role, status, position, preferred_foot, nationality, squad_number, is_onboarded, onboarding_completed')
+          .ilike('username', trimmedUsername)
+          .maybeSingle();
+
+        if (pUnameData) profileData = pUnameData;
+      }
+    } catch (err) {
+      console.warn("Supabase profile status query warning:", err);
+    }
+
+    // 4. Local User Fallback
+    const users = await this.getUsers();
+    const localUser = users.find(u => u.username.toLowerCase() === trimmedUsername.toLowerCase());
+
+    if (!authUser && !localUser) {
       throw new Error("This username does not exist.");
     }
 
-    if (user.passwordHash !== passwordPlain) {
+    if (localUser && localUser.passwordHash && localUser.passwordHash !== passwordPlain && !authUser) {
       throw new Error("Incorrect password.");
     }
 
-    if (user.approved === false) {
-      throw new Error("Your registration application is currently pending administrator approval. Please contact a coach or manager.");
+    // 5. Check Approval Status: If profile.status !== 'approved', block login and sign out immediately
+    const statusVal = profileData?.status || localUser?.status || (localUser?.approved === false ? "pending" : "approved");
+    const statusStr = String(statusVal).trim().toLowerCase();
+
+    const isApproved = statusStr === "approved" || trimmedUsername.toLowerCase() === DEFAULT_ADMIN.username.toLowerCase();
+
+    if (!isApproved) {
+      // Immediately log out from Supabase Auth
+      try {
+        await supabase.auth.signOut();
+      } catch (soErr) {
+        console.warn("Error signing out unapproved user:", soErr);
+      }
+
+      // Prevent navigation by clearing local session
+      localStorage.removeItem(CURRENT_USER_LS_KEY);
+
+      // Display alert notification
+      throw new Error("Your account registration is currently pending Admin approval. Please try again later once an Admin has approved your account.");
     }
 
-    const { passwordHash, ...profile } = user;
-    localStorage.setItem(CURRENT_USER_LS_KEY, JSON.stringify(profile));
-    return profile;
+    // 6. User is approved -> construct profile object & complete login
+    const nameParts = (profileData?.full_name || (localUser?.firstName ? `${localUser.firstName} ${localUser.lastName}` : trimmedUsername)).split(" ");
+    const userRole = (profileData?.role || localUser?.role || UserRole.Player) as UserRole;
+
+    const loggedInProfile: UserProfile = {
+      id: authId || localUser?.id || profileData?.id || profileData?.user_id || `usr_${trimmedUsername}`,
+      user_id: authId || localUser?.user_id || profileData?.user_id,
+      player_id: profileData?.player_id || localUser?.player_id,
+      username: profileData?.username || localUser?.username || trimmedUsername,
+      role: userRole,
+      isAdmin: userRole === UserRole.HeadCoach || (localUser ? localUser.isAdmin : false) || trimmedUsername.toLowerCase() === DEFAULT_ADMIN.username.toLowerCase(),
+      createdAt: localUser?.createdAt || new Date().toISOString(),
+      firstName: localUser?.firstName || nameParts[0] || "",
+      lastName: localUser?.lastName || nameParts.slice(1).join(" ") || "",
+      position: profileData?.position || localUser?.position || "CM",
+      preferredFoot: profileData?.preferred_foot || localUser?.preferredFoot || "Right",
+      preferred_foot: profileData?.preferred_foot || localUser?.preferred_foot || "Right",
+      nationality: profileData?.nationality || localUser?.nationality || "Wales",
+      squad_number: profileData?.squad_number || (localUser as any)?.squad_number,
+      isOnboarded: profileData?.onboarding_completed || profileData?.is_onboarded || localUser?.isOnboarded,
+      is_onboarded: profileData?.onboarding_completed || profileData?.is_onboarded || localUser?.is_onboarded,
+      onboarding_completed: profileData?.onboarding_completed || localUser?.onboarding_completed,
+      approved: true
+    };
+
+    localStorage.setItem(CURRENT_USER_LS_KEY, JSON.stringify(loggedInProfile));
+    return loggedInProfile;
   }
 
   static async findPasswordByUsername(username: string): Promise<string | null> {
@@ -1753,7 +1850,7 @@ export class DataService {
     const userId = authUser?.id || "user_" + Math.random().toString(36).substr(2, 9);
     const playerId = `PLR-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
-    // 2. Immediately upsert their profile information into the Supabase profiles table
+    // 2. Immediately upsert their profile information into Supabase profiles table with status = 'pending'
     try {
       const profileData = {
         id: userId,
@@ -1765,7 +1862,7 @@ export class DataService {
         position: 'CM',
         preferred_foot: 'Right',
         is_onboarded: false,
-        status: 'Approved'
+        status: 'pending'
       };
       const { error } = await (supabase.from('profiles') as any).upsert(profileData, { onConflict: 'user_id' });
 
@@ -1773,7 +1870,7 @@ export class DataService {
         await (supabase.from('profiles') as any).upsert(profileData, { onConflict: 'username' });
       }
 
-      // 3. Direct User Registration = Player Entry: Create player entry in players table
+      // 3. Create player entry in players table
       const playerRecord = {
         id: playerId,
         name: fullName,
@@ -1802,7 +1899,8 @@ export class DataService {
       firstName,
       middleName,
       lastName,
-      approved: true
+      approved: false,
+      status: 'pending'
     };
 
     users.push(newUser);
@@ -2006,6 +2104,25 @@ export class DataService {
     app.status = "approved";
     await this.updateUserPermission(app.userId, { role: app.rolePreference, approved: true });
 
+    // Update row in profiles table in Supabase: status = 'approved'
+    try {
+      await (supabase.from("profiles") as any)
+        .update({ status: 'approved', role: app.rolePreference || app.requestedRole })
+        .eq('id', app.userId);
+
+      await (supabase.from("profiles") as any)
+        .update({ status: 'approved', role: app.rolePreference || app.requestedRole })
+        .eq('user_id', app.userId);
+
+      if (app.username) {
+        await (supabase.from("profiles") as any)
+          .update({ status: 'approved', role: app.rolePreference || app.requestedRole })
+          .eq('username', app.username);
+      }
+    } catch (e) {
+      console.warn("Supabase update profile status approved failed:", e);
+    }
+
     localStorage.setItem("team_perf_analyzer_applications", JSON.stringify(apps));
     try {
       await supabase.from("applications").upsert(this.sanitizeForSupabase(app));
@@ -2021,6 +2138,27 @@ export class DataService {
     if (!app) throw new Error("Application request not found.");
 
     app.status = "rejected";
+    await this.updateUserPermission(app.userId, { approved: false });
+
+    // Update row in profiles table in Supabase: status = 'rejected'
+    try {
+      await (supabase.from("profiles") as any)
+        .update({ status: 'rejected' })
+        .eq('id', app.userId);
+
+      await (supabase.from("profiles") as any)
+        .update({ status: 'rejected' })
+        .eq('user_id', app.userId);
+
+      if (app.username) {
+        await (supabase.from("profiles") as any)
+          .update({ status: 'rejected' })
+          .eq('username', app.username);
+      }
+    } catch (e) {
+      console.warn("Supabase update profile status rejected failed:", e);
+    }
+
     localStorage.setItem("team_perf_analyzer_applications", JSON.stringify(apps));
     try {
       await supabase.from("applications").upsert(this.sanitizeForSupabase(app));

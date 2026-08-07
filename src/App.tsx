@@ -93,14 +93,21 @@ export default function App() {
   };
 
   useEffect(() => {
-    // 1. Check current logged user
+    // 1. Check current logged user and enforce approval check
     const user = DataService.getCurrentUser();
     if (user) {
-      setCurrentUser(user);
-      if (user.role === UserRole.Player) {
-        setActiveTab("my-performance");
+      const statusStr = String((user as any).status || "").trim().toLowerCase();
+      const isApproved = user.username.toLowerCase() === "minwoo6647" || (user.approved !== false && statusStr !== "pending" && statusStr !== "rejected");
+      if (!isApproved) {
+        DataService.logout();
+        setCurrentUser(null);
       } else {
-        setActiveTab("match-hub");
+        setCurrentUser(user);
+        if (user.role === UserRole.Player) {
+          setActiveTab("my-performance");
+        } else {
+          setActiveTab("match-hub");
+        }
       }
     }
 
