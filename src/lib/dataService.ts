@@ -1701,18 +1701,23 @@ export class DataService {
       throw new Error("Please enter a username.");
     }
 
+    // Standardized internal auth email
+    const internalAuthEmail = cleanUsername.includes('@') 
+      ? cleanUsername 
+      : `${cleanUsername}@cardifftownfc.com`;
+
     // 1. Master Admin bypass
     if (cleanUsername === DEFAULT_ADMIN.username.toLowerCase() && passwordPlain === DEFAULT_ADMIN.passwordHash) {
       localStorage.setItem(CURRENT_USER_LS_KEY, JSON.stringify(DEFAULT_ADMIN));
       return DEFAULT_ADMIN;
     }
 
-    // 2. Case-insensitive lookup in Supabase profiles by username first (.ilike('username', inputUsername))
+    // 2. Check profiles first to verify account existence and approval status
     let profileData: any = null;
     try {
       const { data: pData } = await (supabase.from('profiles') as any)
         .select('*')
-        .ilike('username', inputUsername)
+        .ilike('username', cleanUsername)
         .maybeSingle();
 
       if (pData) {
@@ -1720,7 +1725,7 @@ export class DataService {
       } else {
         const { data: pIdData } = await (supabase.from('profiles') as any)
           .select('*')
-          .or(`id.eq.${inputUsername},user_id.eq.${inputUsername}`)
+          .or(`id.eq.${cleanUsername},user_id.eq.${cleanUsername}`)
           .maybeSingle();
 
         if (pIdData) profileData = pIdData;
@@ -1733,17 +1738,28 @@ export class DataService {
     const users = await this.getUsers();
     const localUser = users.find(u => u.username.toLowerCase() === cleanUsername);
 
-    // 4. Determine target email for Auth login
-    const targetUsername = profileData?.username || localUser?.username || cleanUsername;
-    const targetEmail = (profileData?.email || localUser?.email || (inputUsername.includes('@') ? inputUsername : `${targetUsername.toLowerCase()}@ctfc.club`)).trim();
+    // 4. Check Approval Status FIRST if profile is found
+    const statusVal = profileData?.status || localUser?.status || (localUser?.approved === false ? "pending" : "approved");
+    const statusStr = String(statusVal).trim().toLowerCase();
 
-    // 5. Authenticate with Supabase Auth using targetEmail
+    const isApproved = statusStr === "approved" || cleanUsername === DEFAULT_ADMIN.username.toLowerCase();
+
+    if (profileData && !isApproved) {
+      // Immediately log out from Supabase Auth
+      try {
+        await supabase.auth.signOut();
+      } catch {}
+      localStorage.removeItem(CURRENT_USER_LS_KEY);
+      throw new Error("Your account registration is currently pending Admin approval.");
+    }
+
+    // 5. Call supabase.auth.signInWithPassword using internalAuthEmail
     let authUser: any = null;
     let authErr: any = null;
 
     try {
       const { data: authData, error: err } = await supabase.auth.signInWithPassword({
-        email: targetEmail,
+        email: internalAuthEmail,
         password: passwordPlain
       });
 
@@ -1757,15 +1773,16 @@ export class DataService {
       console.warn("Supabase Auth signInWithPassword exception:", e);
     }
 
-    // If Auth failed and input contains '@', try direct email login if different from targetEmail
-    if (!authUser && inputUsername.includes('@') && targetEmail !== inputUsername) {
+    // Fallback try legacy domain (@ctfc.club) if internalAuthEmail failed
+    if (!authUser && !cleanUsername.includes('@')) {
       try {
-        const { data: altAuthData, error: altAuthErr } = await supabase.auth.signInWithPassword({
-          email: inputUsername,
+        const legacyEmail = `${cleanUsername}@ctfc.club`;
+        const { data: legAuthData, error: legErr } = await supabase.auth.signInWithPassword({
+          email: legacyEmail,
           password: passwordPlain
         });
-        if (!altAuthErr && altAuthData?.user) {
-          authUser = altAuthData.user;
+        if (!legErr && legAuthData?.user) {
+          authUser = legAuthData.user;
           authErr = null;
         }
       } catch {}
@@ -1795,28 +1812,19 @@ export class DataService {
       throw new Error("Incorrect password.");
     }
 
-    // 7. Check Approval Status: If profile.status !== 'approved', block login and sign out immediately
-    const statusVal = profileData?.status || localUser?.status || (localUser?.approved === false ? "pending" : "approved");
-    const statusStr = String(statusVal).trim().toLowerCase();
+    // Re-verify approval status for all paths
+    const finalStatusStr = String(profileData?.status || localUser?.status || (localUser?.approved === false ? "pending" : "approved")).trim().toLowerCase();
+    const finalIsApproved = finalStatusStr === "approved" || cleanUsername === DEFAULT_ADMIN.username.toLowerCase();
 
-    const isApproved = statusStr === "approved" || cleanUsername === DEFAULT_ADMIN.username.toLowerCase();
-
-    if (!isApproved) {
-      // Immediately log out from Supabase Auth
+    if (!finalIsApproved) {
       try {
         await supabase.auth.signOut();
-      } catch (soErr) {
-        console.warn("Error signing out unapproved user:", soErr);
-      }
-
-      // Prevent navigation by clearing local session
+      } catch {}
       localStorage.removeItem(CURRENT_USER_LS_KEY);
-
-      // Display alert notification
-      throw new Error("Your account registration is currently pending Admin approval. Please try again later once an Admin has approved your account.");
+      throw new Error("Your account registration is currently pending Admin approval.");
     }
 
-    // 8. User is approved -> construct profile object & complete login
+    // 7. User is approved -> construct profile object & complete login
     const resolvedUsername = profileData?.username || localUser?.username || inputUsername;
     const nameParts = (profileData?.full_name || (localUser?.firstName ? `${localUser.firstName} ${localUser.lastName}` : resolvedUsername)).split(" ");
     const userRole = (profileData?.role || localUser?.role || UserRole.Player) as UserRole;
@@ -1899,13 +1907,17 @@ export class DataService {
     }
 
     const fullName = `${firstName} ${lastName}`.trim();
-    const userEmail = cleanUsername.includes('@') ? cleanUsername : `${cleanUsername}@ctfc.club`;
+    
+    // 1. Construct standardized internal email string
+    const internalAuthEmail = cleanUsername.includes('@') 
+      ? cleanUsername 
+      : `${cleanUsername}@cardifftownfc.com`;
 
-    // 1. Register user via Supabase Auth
+    // Pass internalAuthEmail to supabase.auth.signUp()
     let authUser: { id: string } | null = null;
     try {
       const { data: authData, error: authErr } = await supabase.auth.signUp({
-        email: userEmail,
+        email: internalAuthEmail,
         password: passwordPlain,
         options: {
           data: {
@@ -1928,7 +1940,7 @@ export class DataService {
     const userId = authUser?.id || "user_" + Math.random().toString(36).substr(2, 9);
     const playerId = `PLR-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
-    // 2. Immediately upsert profile into Supabase profiles table with status = 'pending' (Unified payload for all roles)
+    // 2. Save username, full_name, role, and status: 'pending' in public.profiles
     try {
       const profilePayload = {
         id: userId,
