@@ -1862,20 +1862,26 @@ export class DataService {
       return DEFAULT_ADMIN.passwordHash;
     }
 
+    // 1. Local user cache lookup
     const users = await this.getUsers();
-    const found = users.find(u => u.username.toLowerCase() === trimmed.toLowerCase());
+    const found = users.find(u => u.username?.toLowerCase() === trimmed.toLowerCase());
 
     if (found && (found.passwordHash || (found as any).password)) {
       return found.passwordHash || (found as any).password;
     }
 
+    // 2. Supabase profiles query using case-insensitive ilike
     try {
-      const { data } = await supabase.from("profiles").select("*").ilike("username", trimmed);
-      if (data && data.length > 0) {
-        const u = data[0] as any;
-        if (u.passwordHash || u.password) {
-          return u.passwordHash || u.password;
+      const { data: userProfile } = await (supabase.from("profiles") as any)
+        .select("*")
+        .ilike("username", trimmed)
+        .maybeSingle();
+
+      if (userProfile) {
+        if (userProfile.passwordHash || userProfile.password) {
+          return userProfile.passwordHash || userProfile.password;
         }
+        return "Account verified. Please log in with your registered password.";
       }
     } catch (e) {
       console.warn("Supabase lookup for password failed:", e);

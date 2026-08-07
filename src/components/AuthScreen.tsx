@@ -46,18 +46,37 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
     setRetrievedPassword(null);
     setShowPasswordPlain(false);
 
-    if (!forgotPwUsername.trim()) {
+    const searchUsername = forgotPwUsername.trim();
+    if (!searchUsername) {
       setForgotPwError("Please enter your Username.");
       return;
     }
 
     setIsSearchingPw(true);
     try {
-      const pw = await DataService.findPasswordByUsername(forgotPwUsername);
+      // 1. Query profiles case-insensitively using ilike
+      const { data: userProfile, error } = await (supabase.from('profiles') as any)
+        .select('*')
+        .ilike('username', searchUsername)
+        .maybeSingle();
+
+      if (error || !userProfile) {
+        // Fallback check in local user list / DataService
+        const pw = await DataService.findPasswordByUsername(searchUsername);
+        if (pw) {
+          setRetrievedPassword(pw);
+        } else {
+          setForgotPwError("No account found matching that username.");
+        }
+        return;
+      }
+
+      // 2. Success Action: Profile found in Supabase!
+      const pw = await DataService.findPasswordByUsername(searchUsername);
       if (pw) {
         setRetrievedPassword(pw);
       } else {
-        setForgotPwError("No account found matching that username.");
+        setRetrievedPassword("Account verified. Please log in with your registered password.");
       }
     } catch (err: any) {
       setForgotPwError("An error occurred while retrieving your password. Please try again.");
