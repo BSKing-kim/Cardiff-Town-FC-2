@@ -755,8 +755,8 @@ export class ExcelUtils {
     return undefined;
   }
 
-  // Download Player Stats Excel template (Raw count fields ONLY, no percentage columns)
-  static downloadPlayerStatsTemplate(): void {
+  // 1. Download Player Performance Template (Player_Performance_Template.xlsx) - RAW count fields ONLY, NO percentage columns!
+  static downloadPlayerPerformanceTemplate(): void {
     const headers = [
       "username",
       "match_id",
@@ -783,9 +783,9 @@ export class ExcelUtils {
       "aerial_duels_won",
       "ground_duels",
       "ground_duels_won",
+      "ball_recoveries",
       "tackles",
       "tackles_won",
-      "ball_recoveries",
       "interceptions",
       "clearances",
       "blocks",
@@ -827,9 +827,9 @@ export class ExcelUtils {
         "aerial_duels_won": 3,
         "ground_duels": 7,
         "ground_duels_won": 4,
+        "ball_recoveries": 5,
         "tackles": 3,
         "tackles_won": 2,
-        "ball_recoveries": 5,
         "interceptions": 2,
         "clearances": 1,
         "blocks": 1,
@@ -869,9 +869,9 @@ export class ExcelUtils {
         "aerial_duels_won": 2,
         "ground_duels": 10,
         "ground_duels_won": 7,
+        "ball_recoveries": 8,
         "tackles": 5,
         "tackles_won": 4,
-        "ball_recoveries": 8,
         "interceptions": 3,
         "clearances": 2,
         "blocks": 0,
@@ -889,8 +889,116 @@ export class ExcelUtils {
 
     const worksheet = XLSX.utils.json_to_sheet(sampleRows, { header: headers });
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Player_Stats");
-    XLSX.writeFile(workbook, "Player_Stats_Template.xlsx");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Player_Performance");
+    XLSX.writeFile(workbook, "Player_Performance_Template.xlsx");
+  }
+
+  static downloadPlayerStatsTemplate(): void {
+    ExcelUtils.downloadPlayerPerformanceTemplate();
+  }
+
+  // 2. Download Match Fixtures Template (Match_Fixtures_Template.xlsx)
+  static downloadMatchFixturesTemplate(): void {
+    const headers = [
+      "match_id",
+      "date",
+      "opponent",
+      "home_away",
+      "our_score",
+      "opponent_score",
+      "possession",
+      "total_shots",
+      "shots_on_target",
+      "corners",
+      "fouls",
+      "yellow_cards",
+      "red_cards",
+      "status"
+    ];
+
+    const sampleRows = [
+      {
+        "match_id": "M01",
+        "date": "2026-08-15",
+        "opponent": "AFC Roath",
+        "home_away": "Home",
+        "our_score": 2,
+        "opponent_score": 1,
+        "possession": "56%",
+        "total_shots": 14,
+        "shots_on_target": 7,
+        "corners": 6,
+        "fouls": 8,
+        "yellow_cards": 1,
+        "red_cards": 0,
+        "status": "Finished"
+      },
+      {
+        "match_id": "M02",
+        "date": "2026-08-22",
+        "opponent": "Splott Albion",
+        "home_away": "Away",
+        "our_score": 0,
+        "opponent_score": 0,
+        "possession": "50%",
+        "total_shots": 10,
+        "shots_on_target": 4,
+        "corners": 4,
+        "fouls": 10,
+        "yellow_cards": 2,
+        "red_cards": 0,
+        "status": "Scheduled"
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleRows, { header: headers });
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Match_Fixtures");
+    XLSX.writeFile(workbook, "Match_Fixtures_Template.xlsx");
+  }
+
+  // 3. Download Team Roster Template (Team_Roster_Template.xlsx)
+  static downloadTeamRosterTemplate(): void {
+    const headers = [
+      "full_name",
+      "username",
+      "role",
+      "position",
+      "shirt_number",
+      "squad_status"
+    ];
+
+    const sampleRows = [
+      {
+        "full_name": "Liam Davies",
+        "username": "liam_davies",
+        "role": "Player",
+        "position": "CF",
+        "shirt_number": 9,
+        "squad_status": "Active"
+      },
+      {
+        "full_name": "Gethin Vaughan",
+        "username": "gethin_vaughan",
+        "role": "Player",
+        "position": "CM",
+        "shirt_number": 8,
+        "squad_status": "Active"
+      },
+      {
+        "full_name": "David Miller",
+        "username": "david_miller",
+        "role": "Head Coach",
+        "position": "Staff",
+        "shirt_number": "",
+        "squad_status": "Active"
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleRows, { header: headers });
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Team_Roster");
+    XLSX.writeFile(workbook, "Team_Roster_Template.xlsx");
   }
 
   // Download match excel template (Match Performance Data Template)

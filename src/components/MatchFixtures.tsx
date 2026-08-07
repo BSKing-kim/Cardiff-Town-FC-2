@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import TeamLogo from "./TeamLogo";
 import { LEAGUES } from "./TeamDashboard";
+import MatchFixturesBulkImport from "./MatchFixturesBulkImport";
 
 interface MatchFixturesProps {
   currentUser: UserProfile;
@@ -493,6 +494,9 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
           )}
         </div>
       </div>
+
+      {/* Dedicated Import Section: Match Fixture Bulk Import (uses Match_Fixtures_Template.xlsx) */}
+      <MatchFixturesBulkImport currentUser={currentUser} />
 
       {/* Admin Panel to Add Fixture */}
       {showAddForm && isAuthorized && (

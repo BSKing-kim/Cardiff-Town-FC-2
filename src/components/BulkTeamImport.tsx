@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { ExcelUtils, parseAndUploadExcel, selfSimulateExcelUpload } from "../lib/excelUtils";
-import { DataService } from "../lib/dataService";
-import { Download, Upload, Shield, CheckCircle2, AlertTriangle, PlayCircle, Info } from "lucide-react";
+import { Download, Upload, Users, CheckCircle2, AlertTriangle, PlayCircle } from "lucide-react";
 import { UserProfile, UserRole } from "../types";
 
 interface BulkTeamImportProps {
@@ -14,7 +13,6 @@ export default function BulkTeamImport({ currentUser, onTeamsUpdated }: BulkTeam
   const [status, setStatus] = useState<{
     success: boolean;
     message: string;
-    details?: string[];
   } | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
@@ -35,7 +33,7 @@ export default function BulkTeamImport({ currentUser, onTeamsUpdated }: BulkTeam
 
       setStatus({
         success: true,
-        message: `Successfully full-synced ${res.count} teams into the Supabase database.`,
+        message: `Successfully registered and synced ${res.count} team/roster entries into Supabase database.`,
       });
 
       if (onTeamsUpdated) {
@@ -44,7 +42,7 @@ export default function BulkTeamImport({ currentUser, onTeamsUpdated }: BulkTeam
     } catch (err: any) {
       setStatus({
         success: false,
-        message: `Error parsing Team Registration Excel: ${err?.message || String(err)}`
+        message: `Error parsing Team & Roster Excel: ${err?.message || String(err)}`
       });
     } finally {
       setIsUploading(false);
@@ -97,110 +95,89 @@ export default function BulkTeamImport({ currentUser, onTeamsUpdated }: BulkTeam
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
         <div className="flex items-center gap-2.5">
           <div className="bg-cyan-500/15 border border-cyan-500/30 p-2 rounded-lg text-cyan-400">
-            <Shield className="h-5 w-5" />
+            <Users className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="font-display font-bold text-base text-white flex items-center gap-2">
-              Bulk Team Import & Supabase Sync
+            <h3 className="font-display font-black text-sm text-white uppercase tracking-wider">
+              Team & Roster Bulk Import (Admin Only)
             </h3>
-            <p className="text-xs text-slate-400">
-              Register new club teams and league opponents directly into the Supabase database.
+            <p className="text-xs text-slate-400 mt-0.5">
+              Register squad members, coaching staff, and league opponent rosters using the Team Roster Excel Template.
             </p>
           </div>
         </div>
 
         {/* Control Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => ExcelUtils.downloadTeamRosterTemplate()}
+            className="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold py-2 px-3 rounded-lg text-cyan-300 transition-colors shadow-sm cursor-pointer shrink-0"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span>Download Template</span>
+          </button>
+
           <button
             type="button"
             onClick={handleRunSelfTest}
             disabled={isUploading}
             className="inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-2 px-3 rounded-lg transition-all cursor-pointer shadow-md shrink-0 disabled:opacity-50"
           >
-            <PlayCircle className="h-4 w-4" />
-            <span>Run Self-Simulation Test</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => ExcelUtils.downloadTeamRegistrationTemplate()}
-            className="inline-flex items-center justify-center gap-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold py-2 px-3 rounded-lg transition-all cursor-pointer shadow-md shrink-0"
-          >
-            <Download className="h-4 w-4" />
-            <span>Download Template</span>
+            <PlayCircle className="h-3.5 w-3.5" />
+            <span>Simulate Upload</span>
           </button>
         </div>
       </div>
 
-      {/* Automated Team ID Assignment Info Note */}
-      <div className="bg-cyan-950/40 border border-cyan-800/50 rounded-lg p-3 text-xs text-slate-300 flex items-start gap-2.5">
-        <Info className="h-4 w-4 text-cyan-400 shrink-0 mt-0.5" />
-        <div>
-          <p className="font-semibold text-cyan-200">Automated Team ID Assignment</p>
-          <p className="text-slate-300 text-[11px] leading-relaxed mt-0.5">
-            Team IDs are automatically generated upon upload. Only <span className="text-white font-semibold">Team Name</span> is mandatory. Fields like <span className="text-slate-200 font-medium">Short Name</span>, <span className="text-slate-200 font-medium">Division</span>, and <span className="text-slate-200 font-medium">Home Venue</span> are optional.
-          </p>
-        </div>
-      </div>
-
-      {/* Drag and Drop Zone */}
+      {/* Upload Zone */}
       <div
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
-        className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-all ${
-          dragOver 
-            ? "border-cyan-400 bg-cyan-950/30" 
-            : "border-slate-700/80 bg-slate-900/60 hover:border-slate-500"
-        }`}
+        className={`border-2 border-dashed rounded-xl p-6 text-center transition-all ${
+          dragOver ? "border-cyan-400 bg-cyan-500/10" : "border-slate-700 hover:border-slate-600 bg-slate-900/50"
+        } ${!isStaff ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
       >
         <input
           type="file"
           accept=".xlsx, .xls, .csv"
-          disabled={!isStaff || isUploading}
           onChange={handleInputChange}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+          disabled={!isStaff || isUploading}
+          className="hidden"
+          id="team-excel-input"
         />
 
-        <div className="flex flex-col items-center justify-center space-y-2 pointer-events-none">
-          <div className="bg-slate-800 border border-slate-700 p-3 rounded-full text-cyan-400">
-            <Upload className={`h-6 w-6 ${isUploading ? "animate-bounce" : ""}`} />
+        <label htmlFor="team-excel-input" className="cursor-pointer block space-y-3">
+          <div className="mx-auto w-12 h-12 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+            <Upload className="h-6 w-6" />
           </div>
           <div>
             <p className="text-sm font-bold text-white">
-              {isUploading ? "Parsing Spreadsheet & Upserting to Supabase..." : "Click to select or drag & drop Team Registration Excel (.xlsx / .csv)"}
+              {isUploading ? "Syncing Team & Roster to Supabase..." : "Click or Drag & Drop Team Roster Excel File"}
             </p>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Client-Side SheetJS Parsing | Recommended Headers: <span className="text-slate-200 font-semibold">Team Name (Mandatory), Short Name (Optional), Division (Optional), Home Venue (Optional)</span>
+            <p className="text-xs text-slate-400 mt-1">
+              Supports .xlsx, .xls, or .csv pre-formatted files
             </p>
           </div>
-        </div>
+        </label>
       </div>
 
-      {/* Status Output Banner */}
+      {/* Status Feedback */}
       {status && (
-        <div className={`rounded-lg border p-4 text-xs font-sans space-y-1.5 ${
-          status.success 
-            ? "border-emerald-800/60 bg-emerald-950/40 text-emerald-300" 
-            : "border-rose-800/60 bg-rose-950/40 text-rose-300"
+        <div className={`p-4 rounded-xl border flex items-start gap-3 text-xs font-sans font-semibold ${
+          status.success
+            ? "bg-emerald-950/40 border-emerald-800/60 text-emerald-300"
+            : "bg-rose-950/40 border-rose-800/60 text-rose-300"
         }`}>
-          <div className="flex items-center gap-2 font-bold text-sm">
-            {status.success ? (
-              <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
-            ) : (
-              <AlertTriangle className="h-5 w-5 text-rose-400 shrink-0" />
-            )}
-            <span>{status.message}</span>
-          </div>
-
-          {status.details && status.details.length > 0 && (
-            <div className="mt-2 pt-2 border-t border-slate-800/60 font-mono text-[11px] space-y-1 text-slate-300 max-h-32 overflow-y-auto">
-              <p className="font-bold text-slate-200">Validation & Parsing Log:</p>
-              {status.details.map((d, i) => (
-                <p key={i} className="text-amber-300">• {d}</p>
-              ))}
-            </div>
+          {status.success ? (
+            <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
+          ) : (
+            <AlertTriangle className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
           )}
+          <div>
+            <p className="font-bold">{status.message}</p>
+          </div>
         </div>
       )}
     </div>

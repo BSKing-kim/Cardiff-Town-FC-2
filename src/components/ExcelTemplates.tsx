@@ -1,6 +1,6 @@
 import React from "react";
 import { ExcelUtils } from "../lib/excelUtils";
-import { Download, FileSpreadsheet, Info, Shield, User } from "lucide-react";
+import { Download, FileSpreadsheet, Info, Calendar, Users, User } from "lucide-react";
 import { UserProfile, UserRole } from "../types";
 import BulkTeamImport from "./BulkTeamImport";
 import PlayerStatsBulkImport from "./PlayerStatsBulkImport";
@@ -20,20 +20,28 @@ export default function ExcelTemplates({ currentUser, onRefreshData }: ExcelTemp
 
   const templates = [
     {
-      id: "player-stats-template",
-      title: "Player Stats Template",
-      description: "Individual player performance stats template containing raw count metrics only (no percentage columns). Headers: username, match_id, goals, shots, shots_on_target, passes, successful_passes, backwards_passes, forwards_passes, long_passes, successful_long_passes, key_passes, successful_key_passes, through_balls, successful_through_balls, crosses, successful_crosses, dribbles, successful_dribbles, duels, duels_won, aerial_duels, aerial_duels_won, ground_duels, ground_duels_won, tackles, tackles_won, ball_recoveries, interceptions, clearances, blocks, own_goals, turnovers, miscontrols, unsuccessful_dribbles, possession_lost, offsides, fouls, yellow_cards, red_cards.",
-      filename: "Player_Stats_Template.xlsx",
+      id: "player-performance-template",
+      title: "Player Performance Template",
+      description: "Single-match player performance stats template containing raw count metrics only. NO percentage (%) columns. Headers: username, match_id, goals, shots, shots_on_target, passes, successful_passes, backwards_passes, forwards_passes, long_passes, successful_long_passes, key_passes, successful_key_passes, through_balls, successful_through_balls, crosses, successful_crosses, dribbles, successful_dribbles, duels, duels_won, aerial_duels, aerial_duels_won, ground_duels, ground_duels_won, ball_recoveries, tackles, tackles_won, interceptions, clearances, blocks, own_goals, turnovers, miscontrols, unsuccessful_dribbles, possession_lost, offsides, fouls, yellow_cards, red_cards.",
+      filename: "Player_Performance_Template.xlsx",
       icon: User,
-      action: () => ExcelUtils.downloadPlayerStatsTemplate(),
+      action: () => ExcelUtils.downloadPlayerPerformanceTemplate(),
     },
     {
-      id: "league-teams-template",
-      title: "League Teams Template",
-      description: "Registration template for all league clubs and opponents. Team IDs are automatically assigned upon upload. Headers: Team Name (Mandatory), Short Name (Optional), Division (Optional), Home Venue (Optional).",
-      filename: "League_Teams_Template.xlsx",
-      icon: Shield,
-      action: () => ExcelUtils.downloadLeagueTeamsTemplate(),
+      id: "match-fixtures-template",
+      title: "Match Fixtures Template",
+      description: "Batch upload template for match schedules, scores, team possession, and fixture stats. Headers: match_id, date, opponent, home_away, our_score, opponent_score, possession, total_shots, shots_on_target, corners, fouls, yellow_cards, red_cards, status.",
+      filename: "Match_Fixtures_Template.xlsx",
+      icon: Calendar,
+      action: () => ExcelUtils.downloadMatchFixturesTemplate(),
+    },
+    {
+      id: "team-roster-template",
+      title: "Team Roster Template",
+      description: "Batch registration template for club members, players, and coaching staff. Headers: full_name, username, role, position, shirt_number, squad_status.",
+      filename: "Team_Roster_Template.xlsx",
+      icon: Users,
+      action: () => ExcelUtils.downloadTeamRosterTemplate(),
     }
   ];
 
@@ -44,10 +52,10 @@ export default function ExcelTemplates({ currentUser, onRefreshData }: ExcelTemp
         <div className="border-b border-slate-800 pb-4">
           <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5 text-cyan-400" />
-            Excel Spreadsheet Templates
+            3 Dedicated Excel Spreadsheet Templates
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Download pre-formatted Excel spreadsheet templates to batch upload individual player performance stats and team data.
+            Download pre-formatted Excel templates for Player Performance Stats, Match Fixture Schedules, and Team Rosters.
           </p>
         </div>
 
@@ -57,7 +65,7 @@ export default function ExcelTemplates({ currentUser, onRefreshData }: ExcelTemp
           <div className="text-xs space-y-1">
             <p className="font-bold text-white">Spreadsheet Guidelines & Best Practices</p>
             <p className="text-slate-300 leading-relaxed">
-              Please make sure not to alter the header columns of the downloaded files. Percentage metrics are calculated automatically by the system upon upload.
+              Please do not alter header names. In accordance with strict analytics rules, percentage (%) metrics are strictly calculated automatically by the system upon import.
             </p>
             {!isAuthorized && (
               <p className="text-rose-400 font-bold mt-2">
@@ -68,7 +76,7 @@ export default function ExcelTemplates({ currentUser, onRefreshData }: ExcelTemp
         </div>
 
         {/* Templates Grid */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-3">
           {templates.map((tmpl) => {
             const IconComponent = tmpl.icon;
             return (
@@ -87,7 +95,7 @@ export default function ExcelTemplates({ currentUser, onRefreshData }: ExcelTemp
                 </div>
 
                 <div className="pt-4 border-t border-slate-700/60 mt-4 flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400 font-mono font-medium truncate max-w-[160px]" title={tmpl.filename}>
+                  <span className="text-[10px] text-slate-400 font-mono font-medium truncate max-w-[150px]" title={tmpl.filename}>
                     {tmpl.filename}
                   </span>
                   <button
@@ -104,10 +112,10 @@ export default function ExcelTemplates({ currentUser, onRefreshData }: ExcelTemp
         </div>
       </div>
 
-      {/* 1. Player Stats Bulk Import (Admin Center Only) - Directly ABOVE Team Bulk Import */}
+      {/* 1. Top Section in Admin Center: Player Stats Bulk Import (uses Player_Performance_Template.xlsx) */}
       <PlayerStatsBulkImport currentUser={currentUser} onImportSuccess={onRefreshData} />
 
-      {/* 2. Team Bulk Import */}
+      {/* 2. Bottom Section in Admin Center: Team & Roster Bulk Import (uses Team_Roster_Template.xlsx) */}
       <BulkTeamImport currentUser={currentUser} onTeamsUpdated={onRefreshData} />
     </div>
   );
