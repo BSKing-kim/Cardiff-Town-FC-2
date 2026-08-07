@@ -1473,6 +1473,21 @@ export class DataService {
   }
 
   static async getUsers(forceRefresh = false): Promise<(UserProfile & { passwordHash?: string })[]> {
+    const cachedUsersStr = localStorage.getItem(USERS_LS_KEY);
+    let localUsersMap: Map<string, string> = new Map();
+    if (cachedUsersStr) {
+      try {
+        const parsed = JSON.parse(cachedUsersStr);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((u: any) => {
+            if (u.username && (u.passwordHash || u.password)) {
+              localUsersMap.set(u.username.toLowerCase(), u.passwordHash || u.password);
+            }
+          });
+        }
+      } catch {}
+    }
+
     if (!forceRefresh) {
       const cached = this.getCached<(UserProfile & { passwordHash?: string })[]>("users");
       if (cached) return cached;
@@ -1488,6 +1503,8 @@ export class DataService {
             const nameParts = (p.full_name || pUsername).split(" ");
             const fName = nameParts[0] || "";
             const lName = nameParts.slice(1).join(" ") || "";
+            const existingPw = localUsersMap.get(pUsername) || p.passwordHash || p.password;
+
             sbUsers.push({
               id: p.id || p.user_id || `usr_${pUsername}`,
               user_id: p.user_id || p.id,
@@ -1504,8 +1521,8 @@ export class DataService {
               preferred_foot: p.preferred_foot || "Right",
               isOnboarded: !!p.is_onboarded,
               is_onboarded: !!p.is_onboarded,
-              passwordHash: "cardifftownfc1!",
-              approved: p.status !== "Pending"
+              passwordHash: existingPw,
+              approved: p.status !== "Pending" && p.status !== "pending"
             });
           }
         }
@@ -1566,8 +1583,7 @@ export class DataService {
         createdAt: p.created_at || new Date().toISOString(),
         firstName: nameParts[0] || "",
         lastName: nameParts.slice(1).join(" ") || "",
-        passwordHash: "cardifftownfc1!",
-        approved: p.status !== "Pending"
+        approved: p.status !== "Pending" && p.status !== "pending"
       };
     });
   }
