@@ -1626,6 +1626,112 @@ export class ExcelUtils {
     XLSX.writeFile(workbook, "Team_Roster_Template.xlsx");
   }
 
+  // 4. Download Team Stats Template (Team_Stats_Template.xlsx) - RAW count fields ONLY, NO instructions text below!
+  static downloadTeamStatsTemplate(): void {
+    const headers = [
+      "match_id",
+      "date",
+      "opponent",
+      "home_away",
+      "our_score",
+      "opponent_score",
+      "possession",
+      "goals",
+      "shots",
+      "shots_on_target",
+      "passes",
+      "successful_passes",
+      "backwards_passes",
+      "forwards_passes",
+      "long_passes",
+      "successful_long_passes",
+      "key_passes",
+      "successful_key_passes",
+      "through_balls",
+      "successful_through_balls",
+      "crosses",
+      "successful_crosses",
+      "dribbles",
+      "successful_dribbles",
+      "duels",
+      "duels_won",
+      "aerial_duels",
+      "aerial_duels_won",
+      "ground_duels",
+      "ground_duels_won",
+      "ball_recoveries",
+      "tackles",
+      "tackles_won",
+      "interceptions",
+      "clearances",
+      "blocks",
+      "own_goals",
+      "turnovers",
+      "miscontrols",
+      "unsuccessful_dribbles",
+      "possession_lost",
+      "offsides",
+      "fouls",
+      "yellow_cards",
+      "red_cards"
+    ];
+
+    const sampleRows = [
+      {
+        "match_id": "M01",
+        "date": "2026-08-15",
+        "opponent": "AFC Roath",
+        "home_away": "Home",
+        "our_score": 2,
+        "opponent_score": 1,
+        "possession": 55.4,
+        "goals": 2,
+        "shots": 14,
+        "shots_on_target": 7,
+        "passes": 380,
+        "successful_passes": 312,
+        "backwards_passes": 95,
+        "forwards_passes": 185,
+        "long_passes": 45,
+        "successful_long_passes": 32,
+        "key_passes": 12,
+        "successful_key_passes": 8,
+        "through_balls": 6,
+        "successful_through_balls": 4,
+        "crosses": 15,
+        "successful_crosses": 7,
+        "dribbles": 18,
+        "successful_dribbles": 12,
+        "duels": 85,
+        "duels_won": 48,
+        "aerial_duels": 28,
+        "aerial_duels_won": 15,
+        "ground_duels": 57,
+        "ground_duels_won": 33,
+        "ball_recoveries": 42,
+        "tackles": 22,
+        "tackles_won": 16,
+        "interceptions": 14,
+        "clearances": 18,
+        "blocks": 5,
+        "own_goals": 0,
+        "turnovers": 10,
+        "miscontrols": 8,
+        "unsuccessful_dribbles": 6,
+        "possession_lost": 18,
+        "offsides": 3,
+        "fouls": 8,
+        "yellow_cards": 1,
+        "red_cards": 0
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleRows, { header: headers });
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Team_Stats");
+    XLSX.writeFile(workbook, "Team_Stats_Template.xlsx");
+  }
+
   // Download match excel template (Match Performance Data Template)
   static downloadMatchPerformanceTemplate(): void {
     const headers = [
@@ -2632,4 +2738,77 @@ export class ExcelUtils {
       reader.readAsArrayBuffer(file);
     });
   }
+}
+
+export async function parseTeamStatsExcel(file: File): Promise<{ data: any[]; errors?: string[] }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: "" }) as any[];
+
+        const cleanRows = rawRows.map(row => {
+          const matchId = (ExcelUtils as any).extractString(row, ['match_id', 'Match ID', 'Game ID', 'ID']) || `TS_${Date.now()}`;
+          return {
+            id: matchId,
+            match_id: matchId,
+            date: (ExcelUtils as any).extractString(row, ['date', 'Date']) || new Date().toISOString().split('T')[0],
+            opponent: (ExcelUtils as any).extractString(row, ['opponent', 'Opponent']) || 'Opponent Team',
+            home_away: (ExcelUtils as any).extractString(row, ['home_away', 'Home/Away', 'homeAway']) || 'Home',
+            our_score: (ExcelUtils as any).extractInt(row, ['our_score', 'ourScore', 'our_goals', 'goals']),
+            opponent_score: (ExcelUtils as any).extractInt(row, ['opponent_score', 'opponentScore', 'opp_score', 'opp_goals']),
+            possession: (ExcelUtils as any).extractFloat(row, ['possession', 'Possession'], 50),
+            goals: (ExcelUtils as any).extractInt(row, ['goals', 'Goals']),
+            shots: (ExcelUtils as any).extractInt(row, ['shots', 'Shots']),
+            shots_on_target: (ExcelUtils as any).extractInt(row, ['shots_on_target', 'shotsOnTarget']),
+            passes: (ExcelUtils as any).extractInt(row, ['passes', 'Passes']),
+            successful_passes: (ExcelUtils as any).extractInt(row, ['successful_passes', 'successfulPasses']),
+            backwards_passes: (ExcelUtils as any).extractInt(row, ['backwards_passes', 'backwardsPasses']),
+            forwards_passes: (ExcelUtils as any).extractInt(row, ['forwards_passes', 'forwardsPasses']),
+            long_passes: (ExcelUtils as any).extractInt(row, ['long_passes', 'longPasses']),
+            successful_long_passes: (ExcelUtils as any).extractInt(row, ['successful_long_passes', 'successfulLongPasses']),
+            key_passes: (ExcelUtils as any).extractInt(row, ['key_passes', 'keyPasses']),
+            successful_key_passes: (ExcelUtils as any).extractInt(row, ['successful_key_passes', 'successfulKeyPasses']),
+            through_balls: (ExcelUtils as any).extractInt(row, ['through_balls', 'throughBalls']),
+            successful_through_balls: (ExcelUtils as any).extractInt(row, ['successful_through_balls', 'successfulThroughBalls']),
+            crosses: (ExcelUtils as any).extractInt(row, ['crosses', 'Crosses']),
+            successful_crosses: (ExcelUtils as any).extractInt(row, ['successful_crosses', 'successfulCrosses']),
+            dribbles: (ExcelUtils as any).extractInt(row, ['dribbles', 'Dribbles']),
+            successful_dribbles: (ExcelUtils as any).extractInt(row, ['successful_dribbles', 'successfulDribbles']),
+            duels: (ExcelUtils as any).extractInt(row, ['duels', 'Duels']),
+            duels_won: (ExcelUtils as any).extractInt(row, ['duels_won', 'duelsWon']),
+            aerial_duels: (ExcelUtils as any).extractInt(row, ['aerial_duels', 'aerialDuels']),
+            aerial_duels_won: (ExcelUtils as any).extractInt(row, ['aerial_duels_won', 'aerialDuelsWon']),
+            ground_duels: (ExcelUtils as any).extractInt(row, ['ground_duels', 'groundDuels']),
+            ground_duels_won: (ExcelUtils as any).extractInt(row, ['ground_duels_won', 'groundDuelsWon']),
+            ball_recoveries: (ExcelUtils as any).extractInt(row, ['ball_recoveries', 'ballRecoveries']),
+            tackles: (ExcelUtils as any).extractInt(row, ['tackles', 'Tackles']),
+            tackles_won: (ExcelUtils as any).extractInt(row, ['tackles_won', 'tacklesWon']),
+            interceptions: (ExcelUtils as any).extractInt(row, ['interceptions', 'Interceptions']),
+            clearances: (ExcelUtils as any).extractInt(row, ['clearances', 'Clearances']),
+            blocks: (ExcelUtils as any).extractInt(row, ['blocks', 'Blocks']),
+            own_goals: (ExcelUtils as any).extractInt(row, ['own_goals', 'ownGoals']),
+            turnovers: (ExcelUtils as any).extractInt(row, ['turnovers', 'Turnovers']),
+            miscontrols: (ExcelUtils as any).extractInt(row, ['miscontrols', 'Miscontrols']),
+            unsuccessful_dribbles: (ExcelUtils as any).extractInt(row, ['unsuccessful_dribbles', 'unsuccessfulDribbles']),
+            possession_lost: (ExcelUtils as any).extractInt(row, ['possession_lost', 'possessionLost']),
+            offsides: (ExcelUtils as any).extractInt(row, ['offsides', 'Offsides']),
+            fouls: (ExcelUtils as any).extractInt(row, ['fouls', 'Fouls']),
+            yellow_cards: (ExcelUtils as any).extractInt(row, ['yellow_cards', 'yellowCards']),
+            red_cards: (ExcelUtils as any).extractInt(row, ['red_cards', 'redCards'])
+          };
+        }).filter(r => r.id !== "");
+
+        resolve({ data: cleanRows });
+      } catch (err: any) {
+        reject(err);
+      }
+    };
+    reader.onerror = (error) => reject(error);
+    reader.readAsArrayBuffer(file);
+  });
 }

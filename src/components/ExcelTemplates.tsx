@@ -1,9 +1,10 @@
 import React from "react";
 import { ExcelUtils } from "../lib/excelUtils";
-import { Download, FileSpreadsheet, Info, Calendar, Users, User } from "lucide-react";
+import { Download, FileSpreadsheet, Info, Calendar, Users, User, BarChart3 } from "lucide-react";
 import { UserProfile, UserRole } from "../types";
 import BulkTeamImport from "./BulkTeamImport";
 import PlayerStatsBulkImport from "./PlayerStatsBulkImport";
+import TeamStatsBulkImport from "./TeamStatsBulkImport";
 
 interface ExcelTemplatesProps {
   currentUser: UserProfile | null;
@@ -19,6 +20,14 @@ export default function ExcelTemplates({ currentUser, onRefreshData }: ExcelTemp
   );
 
   const templates = [
+    {
+      id: "team-stats-template",
+      title: "Team Stats Template",
+      description: "Dedicated batch upload template for our team's match statistics into public.team_stats. Clean header structure without bottom instruction text. Headers: match_id, date, opponent, home_away, our_score, opponent_score, possession, goals, shots, shots_on_target, passes, successful_passes, backwards_passes, forwards_passes, long_passes, successful_long_passes, key_passes, successful_key_passes, through_balls, successful_through_balls, crosses, successful_crosses, dribbles, successful_dribbles, duels, duels_won, aerial_duels, aerial_duels_won, ground_duels, ground_duels_won, ball_recoveries, tackles, tackles_won, interceptions, clearances, blocks, own_goals, turnovers, miscontrols, unsuccessful_dribbles, possession_lost, offsides, fouls, yellow_cards, red_cards.",
+      filename: "Team_Stats_Template.xlsx",
+      icon: BarChart3,
+      action: () => ExcelUtils.downloadTeamStatsTemplate(),
+    },
     {
       id: "player-performance-template",
       title: "Player Performance Template",
@@ -112,10 +121,13 @@ export default function ExcelTemplates({ currentUser, onRefreshData }: ExcelTemp
         </div>
       </div>
 
-      {/* 1. Top Section in Admin Center: Player Stats Bulk Import (uses Player_Performance_Template.xlsx) */}
+      {/* 1. Dedicated Team Stats Bulk Import (uses Team_Stats_Template.xlsx) */}
+      <TeamStatsBulkImport currentUser={currentUser} onImportSuccess={onRefreshData} />
+
+      {/* 2. Player Stats Bulk Import (uses Player_Performance_Template.xlsx) */}
       <PlayerStatsBulkImport currentUser={currentUser} onImportSuccess={onRefreshData} />
 
-      {/* 2. Bottom Section in Admin Center: Team & Roster Bulk Import (uses Team_Roster_Template.xlsx) */}
+      {/* 3. Team & Roster Bulk Import (uses Team_Roster_Template.xlsx) */}
       <BulkTeamImport currentUser={currentUser} onTeamsUpdated={onRefreshData} />
     </div>
   );
