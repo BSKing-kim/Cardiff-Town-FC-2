@@ -8,17 +8,15 @@ import TeamDashboard from "./components/TeamDashboard";
 import OpponentAnalysis from "./components/OpponentAnalysis";
 import PlayerStats from "./components/PlayerStats";
 import AdminPanel from "./components/AdminPanel";
+import ProfilePage from "./components/ProfilePage";
 import MatchFixtures from "./components/MatchFixtures";
-import MetricsConfig from "./components/MetricsConfig";
-import ExcelTemplates from "./components/ExcelTemplates";
 import LeagueStandings from "./components/LeagueStandings";
 import TeamStats from "./components/TeamStats";
 
 // Icons
 import { 
   TrendingUp, ArrowRightLeft, Users, UserCheck, LogOut, Smartphone,
-  Calendar, Sliders, Shield, FileSpreadsheet, Activity, LayoutDashboard,
-  Menu, X, Trophy, BarChart3
+  Calendar, Sliders, Menu, X, Trophy, BarChart3, UserCog
 } from "lucide-react";
 
 import TeamLogo from "./components/TeamLogo";
@@ -39,6 +37,7 @@ export type ActiveViewTab =
   | "matches-friendly" 
   | "players" 
   | "opponent" 
+  | "profile"
   | "setting-profile" 
   | "setting-management" 
   | "excel-templates";
@@ -121,7 +120,9 @@ export default function App() {
       if (!hash) return;
 
       const [tab, query] = hash.split("?");
-      if (tab) {
+      if (tab === "profile") {
+        setActiveTab("setting-profile");
+      } else if (tab) {
         setActiveTab(tab as ActiveViewTab);
       }
 
@@ -244,7 +245,11 @@ export default function App() {
 
             {/* Top Right: User Avatar, Role Badge & Logout */}
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2.5 bg-[#1e293b] border border-[#334155] rounded-xl px-3 py-1.5">
+              <div 
+                onClick={() => setActiveTab("setting-profile")}
+                className="flex items-center gap-2.5 bg-[#1e293b] border border-[#334155] hover:border-cyan-500 rounded-xl px-3 py-1.5 cursor-pointer transition-all"
+                title="View User Profile"
+              >
                 <div className="h-7 w-7 rounded-full bg-[#eab308] text-[#0b0f19] font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
                   {getUserInitials(currentUser)}
                 </div>
@@ -307,7 +312,11 @@ export default function App() {
           </div>
 
           {/* User Profile Info in Drawer */}
-          <div className="bg-[#1e293b] border border-[#334155] p-3.5 rounded-xl flex items-center gap-3">
+          <div 
+            onClick={() => { setActiveTab("setting-profile"); setDrawerOpen(false); }}
+            className="bg-[#1e293b] border border-[#334155] hover:border-cyan-500 p-3.5 rounded-xl flex items-center gap-3 cursor-pointer transition-all"
+            title="Go to User Profile"
+          >
             <div className="h-10 w-10 rounded-full bg-[#eab308] text-[#0b0f19] font-black text-sm flex items-center justify-center shrink-0 shadow-md">
               {getUserInitials(currentUser)}
             </div>
@@ -373,6 +382,12 @@ export default function App() {
                   icon={ArrowRightLeft}
                   label="Opponent Analysis"
                 />
+                <DrawerButton 
+                  active={activeTab === "setting-profile" || activeTab === "profile"}
+                  onClick={() => { setActiveTab("setting-profile"); setDrawerOpen(false); }}
+                  icon={UserCog}
+                  label="Profile"
+                />
               </>
             ) : (
               <>
@@ -407,7 +422,7 @@ export default function App() {
                   label="Roster / Players"
                 />
                 <DrawerButton 
-                  active={activeTab === "admin-center" || activeTab.startsWith("setting-")}
+                  active={activeTab === "admin-center"}
                   onClick={() => { setActiveTab("admin-center"); setDrawerOpen(false); }}
                   icon={Sliders}
                   label="Admin Center"
@@ -419,10 +434,10 @@ export default function App() {
                   label="Opponent Analysis"
                 />
                 <DrawerButton 
-                  active={activeTab === "excel-templates"}
-                  onClick={() => { setActiveTab("excel-templates"); setDrawerOpen(false); }}
-                  icon={FileSpreadsheet}
-                  label="Excel Templates"
+                  active={activeTab === "setting-profile" || activeTab === "profile"}
+                  onClick={() => { setActiveTab("setting-profile"); setDrawerOpen(false); }}
+                  icon={UserCog}
+                  label="Profile"
                 />
               </>
             )}
@@ -508,24 +523,27 @@ export default function App() {
               <PlayerStats players={players} matches={matches} onPlayersUpdated={() => loadStatsData(true)} currentUser={currentUser} />
             )}
 
-            {(activeTab === "admin-center" || activeTab.startsWith("setting-")) && (
-              <div className="space-y-6">
-                <AdminPanel 
-                  currentUser={currentUser} 
-                  users={allUsers} 
-                  onRefreshUsers={() => loadStatsData(true)} 
-                  onLogout={handleLogout}
-                />
-                <MetricsConfig currentUser={currentUser} customTeams={customTeams} onTeamsUpdated={() => loadStatsData(true)} defaultSubTab="teams" />
-              </div>
+            {activeTab === "admin-center" && (
+              <AdminPanel 
+                currentUser={currentUser} 
+                users={allUsers} 
+                onRefreshUsers={() => loadStatsData(true)} 
+                onLogout={handleLogout}
+                customTeams={customTeams}
+                onTeamsUpdated={() => loadStatsData(true)}
+              />
+            )}
+
+            {(activeTab === "setting-profile" || activeTab === "profile") && (
+              <ProfilePage 
+                currentUser={currentUser} 
+                onUserUpdated={() => loadStatsData(true)} 
+                onLogout={handleLogout}
+              />
             )}
 
             {activeTab === "opponent" && (
               <OpponentAnalysis matches={matches} defaultOpponent={selectedOpponent} customTeams={customTeams} currentUser={currentUser} />
-            )}
-
-            {activeTab === "excel-templates" && (
-              <ExcelTemplates currentUser={currentUser} />
             )}
 
           </div>
@@ -583,4 +601,3 @@ function DrawerButton({ active, onClick, icon: Icon, label }: NavButtonProps) {
     </button>
   );
 }
-
