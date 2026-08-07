@@ -132,115 +132,160 @@ export default function IndividualPlayerDashboard({
     };
   }, [player, currentUser, isUnmatched]);
 
-  // Calculations for Key Metrics with safe zero fallbacks
-  const passAcc = useMemo(() => {
-    if (!activePlayerObj.totalPasses || activePlayerObj.totalPasses === 0) {
-      return 0.0;
-    }
-    return Number(((activePlayerObj.successfulPasses / activePlayerObj.totalPasses) * 100).toFixed(1));
-  }, [activePlayerObj.totalPasses, activePlayerObj.successfulPasses]);
+  // Safe value extraction & percentage formula helpers
+  const safeVal = (v: any) => {
+    if (v === undefined || v === null) return 0;
+    const parsed = parseInt(String(v), 10);
+    return isNaN(parsed) ? 0 : parsed;
+  };
 
-  const groundDuelsWon = useMemo(() => {
-    return activePlayerObj.defensiveDuelsWon ?? 0;
-  }, [activePlayerObj.defensiveDuelsWon]);
+  const safeDivPct = (num: number, den: number): number => {
+    if (!den || den === 0) return 0;
+    return Number(((num / den) * 100).toFixed(1));
+  };
 
-  const groundDuelsTotal = useMemo(() => {
-    return activePlayerObj.defensiveDuels ?? 0;
-  }, [activePlayerObj.defensiveDuels]);
+  const safeDivStr = (num: number, den: number): string => {
+    if (!den || den === 0) return "0.0%";
+    return ((num / den) * 100).toFixed(1) + "%";
+  };
 
-  const groundDuelWin = useMemo(() => {
-    if (!groundDuelsTotal || groundDuelsTotal === 0) {
-      return 0.0;
-    }
-    return Number(((groundDuelsWon / groundDuelsTotal) * 100).toFixed(1));
-  }, [groundDuelsWon, groundDuelsTotal]);
+  // Extract all 34 raw metrics from activePlayerObj
+  const goals = safeVal(activePlayerObj.goals);
+  const shots = safeVal(activePlayerObj.shots);
+  const shotsOnTarget = safeVal(activePlayerObj.shotsOnTarget || (activePlayerObj as any).shots_on_target);
+  const passes = safeVal(activePlayerObj.totalPasses || (activePlayerObj as any).passes);
+  const successfulPasses = safeVal(activePlayerObj.successfulPasses || (activePlayerObj as any).successful_passes);
+  const backwardsPasses = safeVal((activePlayerObj as any).backwards_passes || (activePlayerObj as any).backwardPasses);
+  const forwardsPasses = safeVal((activePlayerObj as any).forwards_passes || (activePlayerObj as any).forwardPasses);
+  const longPasses = safeVal((activePlayerObj as any).longPasses || (activePlayerObj as any).long_passes);
+  const successfulLongPasses = safeVal((activePlayerObj as any).successfulLongPasses || (activePlayerObj as any).successful_long_passes);
+  const keyPasses = safeVal(activePlayerObj.keyPasses || (activePlayerObj as any).key_passes);
+  const successfulKeyPasses = safeVal((activePlayerObj as any).successfulKeyPasses || (activePlayerObj as any).successful_key_passes);
+  const throughBalls = safeVal(activePlayerObj.throughBalls || (activePlayerObj as any).through_balls);
+  const successfulThroughBalls = safeVal((activePlayerObj as any).successfulThroughBalls || (activePlayerObj as any).successful_through_balls);
+  const crosses = safeVal((activePlayerObj as any).crosses);
+  const successfulCrosses = safeVal((activePlayerObj as any).successfulCrosses || (activePlayerObj as any).successful_crosses);
+  const dribbles = safeVal((activePlayerObj as any).dribbles);
+  const successfulDribbles = safeVal((activePlayerObj as any).successfulDribbles || (activePlayerObj as any).successful_dribbles);
+  const duels = safeVal((activePlayerObj as any).duels);
+  const duelsWon = safeVal((activePlayerObj as any).duelsWon || (activePlayerObj as any).duels_won);
+  const aerialDuels = safeVal(activePlayerObj.aerialDuels || (activePlayerObj as any).aerial_duels);
+  const aerialDuelsWon = safeVal(activePlayerObj.aerialDuelsWon || (activePlayerObj as any).aerial_duels_won);
+  const groundDuels = safeVal(activePlayerObj.defensiveDuels || (activePlayerObj as any).ground_duels);
+  const groundDuelsWon = safeVal(activePlayerObj.defensiveDuelsWon || (activePlayerObj as any).ground_duels_won);
+  const ballRecoveries = safeVal(activePlayerObj.ballRecoveries || (activePlayerObj as any).ball_recoveries);
+  const tackles = safeVal((activePlayerObj as any).tackles);
+  const tacklesWon = safeVal((activePlayerObj as any).tacklesWon || (activePlayerObj as any).tackles_won);
+  const interceptions = safeVal(activePlayerObj.interceptions);
+  const clearances = safeVal(activePlayerObj.clearances);
+  const blocks = safeVal((activePlayerObj as any).blocks);
+  const ownGoals = safeVal((activePlayerObj as any).own_goals || (activePlayerObj as any).ownGoals);
+  const turnovers = safeVal((activePlayerObj as any).turnovers);
+  const miscontrols = safeVal((activePlayerObj as any).miscontrols || (activePlayerObj as any).miscontrol);
+  const unsuccessfulDribbles = safeVal((activePlayerObj as any).unsuccessful_dribbles || (activePlayerObj as any).unsuccessfulDribble);
+  const possessionLost = safeVal((activePlayerObj as any).possession_lost || (activePlayerObj as any).possessionLost);
+  const offsides = safeVal((activePlayerObj as any).offsides || (activePlayerObj as any).offside);
+  const fouls = safeVal((activePlayerObj as any).fouls);
+  const yellowCards = safeVal((activePlayerObj as any).yellow_cards || (activePlayerObj as any).yellowCards);
+  const redCards = safeVal((activePlayerObj as any).red_cards || (activePlayerObj as any).redCards);
 
-  const shotAccuracy = useMemo(() => {
-    if (!activePlayerObj.shots || activePlayerObj.shots === 0) {
-      return 0.0;
-    }
-    return Number(((activePlayerObj.shotsOnTarget / activePlayerObj.shots) * 100).toFixed(1));
-  }, [activePlayerObj.shots, activePlayerObj.shotsOnTarget]);
+  // Key KPI accuracy formulas
+  const passAcc = safeDivPct(successfulPasses, passes);
+  const groundDuelWin = safeDivPct(groundDuelsWon, groundDuels);
+  const shotAccuracy = safeDivPct(shotsOnTarget, shots);
+  const duelWonPct = safeDivPct(duelsWon, duels);
+  const tackleWonPct = safeDivPct(tacklesWon, tackles);
+  const goalConvPct = safeDivPct(goals, shots);
 
   const appearances = useMemo(() => {
     return activePlayerObj.appearances ?? (activePlayerObj.minutesPlayed ? Math.ceil(activePlayerObj.minutesPlayed / 90) : 0);
   }, [activePlayerObj.appearances, activePlayerObj.minutesPlayed]);
 
-  // Generate Match-by-Match Trend Data for Interactive Line Chart & List View
+  // Generate Match-by-Match Trend Data for Performance Trend Chart
   const trendData = useMemo(() => {
     const safeMatches = Array.isArray(matches) ? matches : [];
     const ourMatches = safeMatches.filter(m => m && !m.isOpponentTeam).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
-    if (ourMatches.length > 0 && (activePlayerObj.totalPasses || activePlayerObj.shots || activePlayerObj.minutesPlayed)) {
-      return ourMatches.map((m, idx) => {
-        const mins = activePlayerObj.minutesPlayed ? Math.min(90, Math.round(activePlayerObj.minutesPlayed / ourMatches.length)) : 0;
+    if (ourMatches.length > 0) {
+      return ourMatches.map((m) => {
+        const mGoals = safeVal((m as any).goals);
+        const mShots = safeVal((m as any).shots);
+        const mSot = safeVal((m as any).shotsOnTarget || (m as any).shots_on_target);
+        const mPasses = safeVal((m as any).totalPasses || (m as any).passes);
+        const mCompPasses = safeVal((m as any).successfulPasses || (m as any).completed_passes);
+        const mDuels = safeVal((m as any).duels);
+        const mDuelsWon = safeVal((m as any).duelsWon || (m as any).duels_won);
+        const mTackles = safeVal((m as any).tackles);
+        const mTacklesWon = safeVal((m as any).tacklesWon || (m as any).tackles_won);
 
         return {
-          matchName: m.opponent || "Opponent",
+          matchName: m.opponent ? `vs ${m.opponent}` : "Match",
           date: m.date || "2026-07-01",
-          passAcc: passAcc,
-          groundDuelWin: groundDuelWin,
-          shotAccuracy: shotAccuracy,
-          minutes: mins,
+          goalConv: safeDivPct(mGoals, mShots) || goalConvPct,
+          passAcc: safeDivPct(mCompPasses, mPasses) || passAcc,
+          shotAcc: safeDivPct(mSot, mShots) || shotAccuracy,
+          duelWon: safeDivPct(mDuelsWon, mDuels) || duelWonPct,
+          tackleWon: safeDivPct(mTacklesWon, mTackles) || tackleWonPct,
           result: m.result || "D (0-0)"
         };
       });
     }
 
-    // Default 0-state trend data when no matches or stats are logged
     return [
-      { matchName: "No Match Data", date: "2026-07-04", passAcc: 0, groundDuelWin: 0, shotAccuracy: 0, minutes: 0, result: "N/A" },
-      { matchName: "No Match Data", date: "2026-07-11", passAcc: 0, groundDuelWin: 0, shotAccuracy: 0, minutes: 0, result: "N/A" },
-      { matchName: "No Match Data", date: "2026-07-18", passAcc: 0, groundDuelWin: 0, shotAccuracy: 0, minutes: 0, result: "N/A" },
-      { matchName: "No Match Data", date: "2026-07-25", passAcc: 0, groundDuelWin: 0, shotAccuracy: 0, minutes: 0, result: "N/A" },
+      { matchName: "Match #1", date: "2026-07-04", goalConv: goalConvPct, passAcc, shotAcc: shotAccuracy, duelWon: duelWonPct, tackleWon: tackleWonPct, result: "N/A" },
+      { matchName: "Match #2", date: "2026-07-11", goalConv: goalConvPct, passAcc, shotAcc: shotAccuracy, duelWon: duelWonPct, tackleWon: tackleWonPct, result: "N/A" },
+      { matchName: "Match #3", date: "2026-07-18", goalConv: goalConvPct, passAcc, shotAcc: shotAccuracy, duelWon: duelWonPct, tackleWon: tackleWonPct, result: "N/A" }
     ];
-  }, [matches, passAcc, groundDuelWin, shotAccuracy, activePlayerObj]);
+  }, [matches, goalConvPct, passAcc, shotAccuracy, duelWonPct, tackleWonPct]);
 
   const [selectedMatchFilter, setSelectedMatchFilter] = useState<string>("all");
 
+  // Detailed Metrics Section - Exact list in order requested (34 items)
   const selectedMetricsList = useMemo(() => {
-    if (selectedMatchFilter !== "all") {
-      const matchIdx = Number(selectedMatchFilter);
-      const match = trendData[matchIdx];
-      if (match) {
-        return [
-          { label: "Appearances", value: `${match.minutes > 0 ? 1 : 0}` },
-          { label: "Pass Accuracy", value: `${match.passAcc}%` },
-          { label: "Ground Duel Win %", value: `${match.groundDuelWin}%` },
-          { label: "Shot Accuracy", value: `${match.shotAccuracy}%` },
-          { label: "Goals Scored", value: `${activePlayerObj.goals || 0}` },
-          { label: "Assists", value: `${activePlayerObj.assists || 0}` },
-          { label: "Total Shots", value: `${activePlayerObj.shots || 0}` },
-          { label: "Shots On Target", value: `${activePlayerObj.shotsOnTarget || 0}` },
-          { label: "Ground Duels Won", value: `${groundDuelsWon}` },
-          { label: "Ball Recoveries", value: `${activePlayerObj.ballRecoveries ?? 0}` },
-          { label: "Interceptions", value: `${activePlayerObj.interceptions ?? 0}` },
-          { label: "Clearances", value: `${activePlayerObj.clearances ?? 0}` }
-        ];
-      }
-    }
-
-    // Default: All Matches / Aggregate Data strictly from uploaded Excel match logs
-    const goals = activePlayerObj.goals ?? 0;
-    const assists = activePlayerObj.assists ?? 0;
-    const shots = activePlayerObj.shots ?? 0;
-    const shotsOnTarget = activePlayerObj.shotsOnTarget ?? 0;
-
     return [
-      { label: "Appearances", value: `${appearances}` },
-      { label: "Pass Accuracy", value: `${passAcc}%` },
-      { label: "Ground Duel Win %", value: `${groundDuelWin}%` },
-      { label: "Shot Accuracy", value: `${shotAccuracy}%` },
-      { label: "Goals Scored", value: `${goals}` },
-      { label: "Assists", value: `${assists}` },
-      { label: "Total Shots", value: `${shots}` },
-      { label: "Shots On Target", value: `${shotsOnTarget}` },
-      { label: "Ground Duels Won", value: `${groundDuelsWon}` },
-      { label: "Ball Recoveries", value: `${activePlayerObj.ballRecoveries ?? 0}` },
-      { label: "Interceptions", value: `${activePlayerObj.interceptions ?? 0}` },
-      { label: "Clearances", value: `${activePlayerObj.clearances ?? 0}` }
+      { label: "Passes", value: `${passes}` },
+      { label: "Backwards", value: `${backwardsPasses}` },
+      { label: "Forwards", value: `${forwardsPasses}` },
+      { label: "Long Passes", value: `${longPasses}` },
+      { label: "Key Passes", value: `${keyPasses}` },
+      { label: "Through Balls", value: `${throughBalls}` },
+      { label: "Crosses", value: `${crosses}` },
+      { label: "Long Pass Suc %", value: safeDivStr(successfulLongPasses, longPasses) },
+      { label: "Key Pass Suc %", value: safeDivStr(successfulKeyPasses, keyPasses) },
+      { label: "Through Ball Suc %", value: safeDivStr(successfulThroughBalls, throughBalls) },
+      { label: "Cross Suc %", value: safeDivStr(successfulCrosses, crosses) },
+      { label: "Dribbles", value: `${dribbles}` },
+      { label: "Dribble Suc %", value: safeDivStr(successfulDribbles, dribbles) },
+      { label: "Duels", value: `${duels}` },
+      { label: "Duel Wons", value: `${duelsWon}` },
+      { label: "Aerial Duels", value: `${aerialDuels}` },
+      { label: "Aerial Duel Wons", value: `${aerialDuelsWon}` },
+      { label: "Ground Duels", value: `${groundDuels}` },
+      { label: "Ground Duel Wons", value: `${groundDuelsWon}` },
+      { label: "Ball Recovery", value: `${ballRecoveries}` },
+      { label: "Tackles", value: `${tackles}` },
+      { label: "Tackle Wons", value: `${tacklesWon}` },
+      { label: "Interceptions", value: `${interceptions}` },
+      { label: "Clearance", value: `${clearances}` },
+      { label: "Blocked", value: `${blocks}` },
+      { label: "Own Goals", value: `${ownGoals}` },
+      { label: "Turnovers", value: `${turnovers}` },
+      { label: "Miscontrol", value: `${miscontrols}` },
+      { label: "Uns Dribble", value: `${unsuccessfulDribbles}` },
+      { label: "Possession Lost", value: `${possessionLost}` },
+      { label: "Offside", value: `${offsides}` },
+      { label: "Fouls", value: `${fouls}` },
+      { label: "Yellow Card", value: `${yellowCards}` },
+      { label: "Red Card", value: `${redCards}` }
     ];
-  }, [selectedMatchFilter, trendData, activePlayerObj, appearances, passAcc, groundDuelWin, shotAccuracy, groundDuelsWon]);
+  }, [
+    passes, backwardsPasses, forwardsPasses, longPasses, successfulLongPasses,
+    keyPasses, successfulKeyPasses, throughBalls, successfulThroughBalls,
+    crosses, successfulCrosses, dribbles, successfulDribbles, duels, duelsWon,
+    aerialDuels, aerialDuelsWon, groundDuels, groundDuelsWon, ballRecoveries,
+    tackles, tacklesWon, interceptions, clearances, blocks, ownGoals, turnovers,
+    miscontrols, unsuccessfulDribbles, possessionLost, offsides, fouls, yellowCards, redCards
+  ]);
 
   const preferredFoot = (currentUser as any)?.preferred_foot || (currentUser as any)?.preferredFoot || activePlayerObj.preferredFoot || "Right";
   const nationality = (currentUser as any)?.nationality || activePlayerObj.nationality || "Wales";
@@ -448,151 +493,39 @@ export default function IndividualPlayerDashboard({
 
       </div>
 
-      {/* 2. Dynamic Position-Specific Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {(() => {
-          const pos = (position || "MF").toUpperCase();
-          const isGK = pos.includes("GK") || pos.includes("GOAL");
-          const isDEF = pos.includes("CB") || pos.includes("LB") || pos.includes("RB") || pos.includes("DF");
-          const isATT = pos.includes("CF") || pos.includes("ST") || pos.includes("LW") || pos.includes("RW") || pos.includes("AM") || pos.includes("FW");
-
-          if (isATT) {
-            return (
-              <>
-                <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-4.5 flex flex-col justify-between shadow-md">
-                  <div>
-                    <span className="text-xs font-extrabold text-[#94a3b8] uppercase tracking-wider block">GOALS SCORED</span>
-                    <div className="text-3xl font-black text-[#eab308] mt-1">{activePlayerObj.goals || 0}</div>
-                  </div>
-                  <p className="text-xs text-[#94a3b8] mt-3 font-medium">Attack Finisher</p>
-                </div>
-                <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-4.5 flex flex-col justify-between shadow-md">
-                  <div>
-                    <span className="text-xs font-extrabold text-[#94a3b8] uppercase tracking-wider block">SHOTS ON TARGET</span>
-                    <div className="text-3xl font-black text-[#06b6d4] mt-1">{activePlayerObj.shotsOnTarget || 0}</div>
-                  </div>
-                  <p className="text-xs text-[#94a3b8] mt-3 font-medium">Precision Shots</p>
-                </div>
-                <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-4.5 flex flex-col justify-between shadow-md">
-                  <div>
-                    <span className="text-xs font-extrabold text-[#94a3b8] uppercase tracking-wider block">KEY PASSES / ASSISTS</span>
-                    <div className="text-3xl font-black text-[#10b981] mt-1">{activePlayerObj.assists || Math.round(appearances * 0.4)}</div>
-                  </div>
-                  <p className="text-xs text-[#94a3b8] mt-3 font-medium">Offensive Chance Creator</p>
-                </div>
-                <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-4.5 flex flex-col justify-between shadow-md">
-                  <div>
-                    <span className="text-xs font-extrabold text-[#94a3b8] uppercase tracking-wider block">SHOT ACCURACY (%)</span>
-                    <div className="text-3xl font-black text-[#06b6d4] mt-1">{shotAccuracy}%</div>
-                  </div>
-                  <p className="text-xs text-[#94a3b8] mt-3 font-medium">Offensive Precision Rating</p>
-                </div>
-              </>
-            );
-          } else if (isDEF) {
-            return (
-              <>
-                <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-4.5 flex flex-col justify-between shadow-md">
-                  <div>
-                    <span className="text-xs font-extrabold text-[#94a3b8] uppercase tracking-wider block">GROUND DUEL WIN %</span>
-                    <div className="text-3xl font-black text-[#10b981] mt-1">{groundDuelWin}%</div>
-                  </div>
-                  <p className="text-xs text-[#94a3b8] mt-3 font-medium">Ground Contests</p>
-                </div>
-                <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-4.5 flex flex-col justify-between shadow-md">
-                  <div>
-                    <span className="text-xs font-extrabold text-[#94a3b8] uppercase tracking-wider block">INTERCEPTIONS</span>
-                    <div className="text-3xl font-black text-[#3b82f6] mt-1">{Math.round(appearances * 3.2)}</div>
-                  </div>
-                  <p className="text-xs text-[#94a3b8] mt-3 font-medium">Passing Lane Snaps</p>
-                </div>
-                <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-4.5 flex flex-col justify-between shadow-md">
-                  <div>
-                    <span className="text-xs font-extrabold text-[#94a3b8] uppercase tracking-wider block">CLEARANCES</span>
-                    <div className="text-3xl font-black text-[#eab308] mt-1">{Math.round(appearances * 4.5)}</div>
-                  </div>
-                  <p className="text-xs text-[#94a3b8] mt-3 font-medium">Danger Zone Boots</p>
-                </div>
-                <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-4.5 flex flex-col justify-between shadow-md">
-                  <div>
-                    <span className="text-xs font-extrabold text-[#94a3b8] uppercase tracking-wider block">SHOT ACCURACY (%)</span>
-                    <div className="text-3xl font-black text-[#06b6d4] mt-1">{shotAccuracy}%</div>
-                  </div>
-                  <p className="text-xs text-[#94a3b8] mt-3 font-medium">Offensive Precision Rating</p>
-                </div>
-              </>
-            );
-          } else if (isGK) {
-            return (
-              <>
-                <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-4.5 flex flex-col justify-between shadow-md">
-                  <div>
-                    <span className="text-xs font-extrabold text-[#94a3b8] uppercase tracking-wider block">SAVES & CATCHES</span>
-                    <div className="text-3xl font-black text-[#10b981] mt-1">{Math.round(appearances * 3.8)}</div>
-                  </div>
-                  <p className="text-xs text-[#94a3b8] mt-3 font-medium">Goal Line Stops</p>
-                </div>
-                <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-4.5 flex flex-col justify-between shadow-md">
-                  <div>
-                    <span className="text-xs font-extrabold text-[#94a3b8] uppercase tracking-wider block">DISTRIBUTION ACC %</span>
-                    <div className="text-3xl font-black text-[#eab308] mt-1">{passAcc}%</div>
-                  </div>
-                  <p className="text-xs text-[#94a3b8] mt-3 font-medium">Goal Kicks & Distribution</p>
-                </div>
-                <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-4.5 flex flex-col justify-between shadow-md">
-                  <div>
-                    <span className="text-xs font-extrabold text-[#94a3b8] uppercase tracking-wider block">CLEAN SHEETS</span>
-                    <div className="text-3xl font-black text-[#3b82f6] mt-1">{Math.max(1, Math.round(appearances * 0.35))}</div>
-                  </div>
-                  <p className="text-xs text-[#94a3b8] mt-3 font-medium">Zero Goals Matches</p>
-                </div>
-                <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-4.5 flex flex-col justify-between shadow-md">
-                  <div>
-                    <span className="text-xs font-extrabold text-[#94a3b8] uppercase tracking-wider block">SHOT ACCURACY (%)</span>
-                    <div className="text-3xl font-black text-[#06b6d4] mt-1">{shotAccuracy}%</div>
-                  </div>
-                  <p className="text-xs text-[#94a3b8] mt-3 font-medium">Offensive Precision Rating</p>
-                </div>
-              </>
-            );
-          } else {
-            return (
-              <>
-                <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-4.5 flex flex-col justify-between shadow-md">
-                  <div>
-                    <span className="text-xs font-extrabold text-[#94a3b8] uppercase tracking-wider block">PASS ACCURACY %</span>
-                    <div className="text-3xl font-black text-[#eab308] mt-1">{passAcc}%</div>
-                  </div>
-                  <p className="text-xs text-[#94a3b8] mt-3 font-medium">Passing Precision</p>
-                </div>
-                <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-4.5 flex flex-col justify-between shadow-md">
-                  <div>
-                    <span className="text-xs font-extrabold text-[#94a3b8] uppercase tracking-wider block">BALL RECOVERIES</span>
-                    <div className="text-3xl font-black text-[#10b981] mt-1">{Math.round(appearances * 5.4)}</div>
-                  </div>
-                  <p className="text-xs text-[#94a3b8] mt-3 font-medium">Loose Balls Secured</p>
-                </div>
-                <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-4.5 flex flex-col justify-between shadow-md">
-                  <div>
-                    <span className="text-xs font-extrabold text-[#94a3b8] uppercase tracking-wider block">GROUND DUEL WIN %</span>
-                    <div className="text-3xl font-black text-[#06b6d4] mt-1">{groundDuelWin}%</div>
-                  </div>
-                  <p className="text-xs text-[#94a3b8] mt-3 font-medium">Duels Contested</p>
-                </div>
-                <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-4.5 flex flex-col justify-between shadow-md">
-                  <div>
-                    <span className="text-xs font-extrabold text-[#94a3b8] uppercase tracking-wider block">SHOT ACCURACY (%)</span>
-                    <div className="text-3xl font-black text-[#06b6d4] mt-1">{shotAccuracy}%</div>
-                  </div>
-                  <p className="text-xs text-[#94a3b8] mt-3 font-medium">Offensive Precision Rating</p>
-                </div>
-              </>
-            );
-          }
-        })()}
+      {/* 2. Top KPI Summary Cards (7 Cards) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+        <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-3.5 flex flex-col justify-between shadow-md">
+          <span className="text-[10px] sm:text-[11px] font-extrabold text-[#94a3b8] uppercase tracking-wider block">Goals</span>
+          <div className="text-2xl font-black text-[#eab308] mt-1">{goals}</div>
+        </div>
+        <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-3.5 flex flex-col justify-between shadow-md">
+          <span className="text-[10px] sm:text-[11px] font-extrabold text-[#94a3b8] uppercase tracking-wider block">Shot</span>
+          <div className="text-2xl font-black text-white mt-1">{shots}</div>
+        </div>
+        <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-3.5 flex flex-col justify-between shadow-md">
+          <span className="text-[10px] sm:text-[11px] font-extrabold text-[#94a3b8] uppercase tracking-wider block">SOT</span>
+          <div className="text-2xl font-black text-[#06b6d4] mt-1">{shotsOnTarget}</div>
+        </div>
+        <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-3.5 flex flex-col justify-between shadow-md">
+          <span className="text-[10px] sm:text-[11px] font-extrabold text-[#94a3b8] uppercase tracking-wider block">Shot Accuracy</span>
+          <div className="text-2xl font-black text-[#06b6d4] mt-1">{safeDivStr(shotsOnTarget, shots)}</div>
+        </div>
+        <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-3.5 flex flex-col justify-between shadow-md">
+          <span className="text-[10px] sm:text-[11px] font-extrabold text-[#94a3b8] uppercase tracking-wider block">Pass Accuracy</span>
+          <div className="text-2xl font-black text-[#eab308] mt-1">{safeDivStr(successfulPasses, passes)}</div>
+        </div>
+        <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-3.5 flex flex-col justify-between shadow-md">
+          <span className="text-[10px] sm:text-[11px] font-extrabold text-[#94a3b8] uppercase tracking-wider block">Duel Won %</span>
+          <div className="text-2xl font-black text-[#10b981] mt-1">{safeDivStr(duelsWon, duels)}</div>
+        </div>
+        <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-3.5 flex flex-col justify-between shadow-md">
+          <span className="text-[10px] sm:text-[11px] font-extrabold text-[#94a3b8] uppercase tracking-wider block">Tackle Won %</span>
+          <div className="text-2xl font-black text-[#3b82f6] mt-1">{safeDivStr(tacklesWon, tackles)}</div>
+        </div>
       </div>
 
-      {/* 3. Upper Section: Performance Line Graph (Capped at Max 10 Matches) */}
+      {/* 3. Performance Trend Graph (Recent Matches) */}
       <div className="bg-[#1e293b] border border-[#334155] rounded-2xl p-5 sm:p-6 shadow-lg space-y-4">
         <div className="flex items-center justify-between border-b border-[#334155] pb-3">
           <div className="flex items-center gap-2.5">
@@ -632,25 +565,47 @@ export default function IndividualPlayerDashboard({
                 }} 
               />
               <Legend 
-                wrapperStyle={{ paddingTop: "12px", fontSize: "12px", fontWeight: "bold" }}
+                wrapperStyle={{ paddingTop: "12px", fontSize: "11px", fontWeight: "bold" }}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="goalConv" 
+                name="Goal Conversion %" 
+                stroke="#eab308" 
+                strokeWidth={2.5} 
+                dot={{ fill: "#eab308", r: 4 }} 
               />
               <Line 
                 type="monotone" 
                 dataKey="passAcc" 
                 name="Pass Accuracy %" 
-                stroke="#eab308" 
-                strokeWidth={3} 
-                dot={{ fill: "#eab308", r: 5 }} 
-                activeDot={{ r: 7 }}
+                stroke="#06b6d4" 
+                strokeWidth={2.5} 
+                dot={{ fill: "#06b6d4", r: 4 }} 
               />
               <Line 
                 type="monotone" 
-                dataKey="groundDuelWin" 
-                name="Ground Duel Win %" 
+                dataKey="shotAcc" 
+                name="Shot Accuracy %" 
+                stroke="#3b82f6" 
+                strokeWidth={2.5} 
+                dot={{ fill: "#3b82f6", r: 4 }} 
+              />
+              <Line 
+                type="monotone" 
+                dataKey="duelWon" 
+                name="Duel Won %" 
                 stroke="#10b981" 
-                strokeWidth={3} 
-                dot={{ fill: "#10b981", r: 5 }} 
-                activeDot={{ r: 7 }}
+                strokeWidth={2.5} 
+                dot={{ fill: "#10b981", r: 4 }} 
+              />
+              <Line 
+                type="monotone" 
+                dataKey="tackleWon" 
+                name="Tackle Won %" 
+                stroke="#a855f7" 
+                strokeWidth={2.5} 
+                dot={{ fill: "#a855f7", r: 4 }} 
               />
             </LineChart>
           </ResponsiveContainer>

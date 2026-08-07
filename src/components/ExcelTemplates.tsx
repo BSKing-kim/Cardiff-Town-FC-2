@@ -1,14 +1,16 @@
 import React from "react";
 import { ExcelUtils } from "../lib/excelUtils";
-import { Download, Users, Calendar, MapPin, FileSpreadsheet, Info, Shield } from "lucide-react";
+import { Download, FileSpreadsheet, Info, Shield, User } from "lucide-react";
 import { UserProfile, UserRole } from "../types";
 import BulkTeamImport from "./BulkTeamImport";
+import PlayerStatsBulkImport from "./PlayerStatsBulkImport";
 
 interface ExcelTemplatesProps {
   currentUser: UserProfile | null;
+  onRefreshData?: () => void;
 }
 
-export default function ExcelTemplates({ currentUser }: ExcelTemplatesProps) {
+export default function ExcelTemplates({ currentUser, onRefreshData }: ExcelTemplatesProps) {
   const isAuthorized = currentUser && (
     currentUser.role === UserRole.HeadCoach ||
     currentUser.role === UserRole.Manager ||
@@ -18,12 +20,12 @@ export default function ExcelTemplates({ currentUser }: ExcelTemplatesProps) {
 
   const templates = [
     {
-      id: "match-performance-template",
-      title: "Match Performance Data Template",
-      description: "Single-match player performance stats template. Headers: Match ID, Player Name, Player ID, Position, Minutes Played, Goals, Shots, Shot Accuracy, Shots Inside Box, Shots Outside Box, Headed Shots, Blocked Shots, Total Passes, Completed Passes, Long Passes, Completed Long Passes, Passes Opponent Half, Completed Opponent Half, Passes Final Third, Completed Final Third, Forward Passes, Through Balls, Crosses, Completed Crosses, Possession (%), Duels, Duels Won, Aerial Duels, Aerial Duels Won, Ground Duels, Ground Duels Won, Final Third Entries, Box Entries, Tackles, Tackles Won, Clearances, Interceptions, Blocks, Recovery Rate, Corners, Fouls, Was Fouled, Yellow Cards, Red Cards.",
-      filename: "Match_Performance_Template.xlsx",
-      icon: FileSpreadsheet,
-      action: () => ExcelUtils.downloadMatchPerformanceTemplate(),
+      id: "player-stats-template",
+      title: "Player Stats Template",
+      description: "Individual player performance stats template containing raw count metrics only (no percentage columns). Headers: username, match_id, goals, shots, shots_on_target, passes, successful_passes, backwards_passes, forwards_passes, long_passes, successful_long_passes, key_passes, successful_key_passes, through_balls, successful_through_balls, crosses, successful_crosses, dribbles, successful_dribbles, duels, duels_won, aerial_duels, aerial_duels_won, ground_duels, ground_duels_won, tackles, tackles_won, ball_recoveries, interceptions, clearances, blocks, own_goals, turnovers, miscontrols, unsuccessful_dribbles, possession_lost, offsides, fouls, yellow_cards, red_cards.",
+      filename: "Player_Stats_Template.xlsx",
+      icon: User,
+      action: () => ExcelUtils.downloadPlayerStatsTemplate(),
     },
     {
       id: "league-teams-template",
@@ -45,7 +47,7 @@ export default function ExcelTemplates({ currentUser }: ExcelTemplatesProps) {
             Excel Spreadsheet Templates
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Download pre-formatted Excel spreadsheet templates to batch upload your players, team matches, individual fixture stats, and tactical tracking heatmap coordinates.
+            Download pre-formatted Excel spreadsheet templates to batch upload individual player performance stats and team data.
           </p>
         </div>
 
@@ -55,7 +57,7 @@ export default function ExcelTemplates({ currentUser }: ExcelTemplatesProps) {
           <div className="text-xs space-y-1">
             <p className="font-bold text-white">Spreadsheet Guidelines & Best Practices</p>
             <p className="text-slate-300 leading-relaxed">
-              Please make sure not to alter the header columns of the downloaded files, as the automated parser depends on exact header names (or their direct aliases) to successfully process and index your club records. You can upload the populated spreadsheets directly in their respective menus (Squad tab for Players, Matches tab for fixtures and team stats).
+              Please make sure not to alter the header columns of the downloaded files. Percentage metrics are calculated automatically by the system upon upload.
             </p>
             {!isAuthorized && (
               <p className="text-rose-400 font-bold mt-2">
@@ -66,7 +68,7 @@ export default function ExcelTemplates({ currentUser }: ExcelTemplatesProps) {
         </div>
 
         {/* Templates Grid */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
           {templates.map((tmpl) => {
             const IconComponent = tmpl.icon;
             return (
@@ -102,8 +104,11 @@ export default function ExcelTemplates({ currentUser }: ExcelTemplatesProps) {
         </div>
       </div>
 
-      {/* Bulk Team Import Section */}
-      <BulkTeamImport currentUser={currentUser} />
+      {/* 1. Player Stats Bulk Import (Admin Center Only) - Directly ABOVE Team Bulk Import */}
+      <PlayerStatsBulkImport currentUser={currentUser} onImportSuccess={onRefreshData} />
+
+      {/* 2. Team Bulk Import */}
+      <BulkTeamImport currentUser={currentUser} onTeamsUpdated={onRefreshData} />
     </div>
   );
 }

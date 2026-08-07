@@ -263,10 +263,42 @@ export default function MyPerformance({ currentUser, players = [], matches = [] 
       const totalGoals = myLogs.reduce((acc, l) => acc + (parseInt(l.goals || '0', 10) || 0), 0);
       const totalAssists = myLogs.reduce((acc, l) => acc + (parseInt(l.assists || '0', 10) || 0), 0);
       const totalShots = myLogs.reduce((acc, l) => acc + (parseInt(l.shots || '0', 10) || 0), 0);
-      const totalPasses = myLogs.reduce((acc, l) => acc + (parseInt(l.total_passes || l.passes || '0', 10) || 0), 0);
-      const compPasses = myLogs.reduce((acc, l) => acc + (parseInt(l.completed_passes || '0', 10) || 0), 0);
+      const totalSot = myLogs.reduce((acc, l) => acc + (parseInt(l.shots_on_target || l.shotsOnTarget || '0', 10) || 0), 0);
+      const totalPasses = myLogs.reduce((acc, l) => acc + (parseInt(l.passes || l.total_passes || '0', 10) || 0), 0);
+      const compPasses = myLogs.reduce((acc, l) => acc + (parseInt(l.successful_passes || l.completed_passes || '0', 10) || 0), 0);
+      const backwardsPasses = myLogs.reduce((acc, l) => acc + (parseInt(l.backwards_passes || '0', 10) || 0), 0);
+      const forwardsPasses = myLogs.reduce((acc, l) => acc + (parseInt(l.forwards_passes || '0', 10) || 0), 0);
+      const longPasses = myLogs.reduce((acc, l) => acc + (parseInt(l.long_passes || '0', 10) || 0), 0);
+      const compLongPasses = myLogs.reduce((acc, l) => acc + (parseInt(l.successful_long_passes || '0', 10) || 0), 0);
+      const keyPasses = myLogs.reduce((acc, l) => acc + (parseInt(l.key_passes || '0', 10) || 0), 0);
+      const compKeyPasses = myLogs.reduce((acc, l) => acc + (parseInt(l.successful_key_passes || '0', 10) || 0), 0);
+      const throughBalls = myLogs.reduce((acc, l) => acc + (parseInt(l.through_balls || '0', 10) || 0), 0);
+      const compThroughBalls = myLogs.reduce((acc, l) => acc + (parseInt(l.successful_through_balls || '0', 10) || 0), 0);
+      const crosses = myLogs.reduce((acc, l) => acc + (parseInt(l.crosses || '0', 10) || 0), 0);
+      const compCrosses = myLogs.reduce((acc, l) => acc + (parseInt(l.successful_crosses || '0', 10) || 0), 0);
+      const dribbles = myLogs.reduce((acc, l) => acc + (parseInt(l.dribbles || '0', 10) || 0), 0);
+      const compDribbles = myLogs.reduce((acc, l) => acc + (parseInt(l.successful_dribbles || '0', 10) || 0), 0);
+      const duels = myLogs.reduce((acc, l) => acc + (parseInt(l.duels || '0', 10) || 0), 0);
+      const duelsWon = myLogs.reduce((acc, l) => acc + (parseInt(l.duels_won || '0', 10) || 0), 0);
+      const aerialDuels = myLogs.reduce((acc, l) => acc + (parseInt(l.aerial_duels || '0', 10) || 0), 0);
+      const aerialDuelsWon = myLogs.reduce((acc, l) => acc + (parseInt(l.aerial_duels_won || '0', 10) || 0), 0);
+      const groundDuels = myLogs.reduce((acc, l) => acc + (parseInt(l.ground_duels || '0', 10) || 0), 0);
+      const groundDuelsWon = myLogs.reduce((acc, l) => acc + (parseInt(l.ground_duels_won || '0', 10) || 0), 0);
       const tackles = myLogs.reduce((acc, l) => acc + (parseInt(l.tackles || '0', 10) || 0), 0);
+      const tacklesWon = myLogs.reduce((acc, l) => acc + (parseInt(l.tackles_won || '0', 10) || 0), 0);
+      const ballRecoveries = myLogs.reduce((acc, l) => acc + (parseInt(l.ball_recoveries || '0', 10) || 0), 0);
       const interceptions = myLogs.reduce((acc, l) => acc + (parseInt(l.interceptions || '0', 10) || 0), 0);
+      const clearances = myLogs.reduce((acc, l) => acc + (parseInt(l.clearances || '0', 10) || 0), 0);
+      const blocks = myLogs.reduce((acc, l) => acc + (parseInt(l.blocks || '0', 10) || 0), 0);
+      const ownGoals = myLogs.reduce((acc, l) => acc + (parseInt(l.own_goals || '0', 10) || 0), 0);
+      const turnovers = myLogs.reduce((acc, l) => acc + (parseInt(l.turnovers || '0', 10) || 0), 0);
+      const miscontrols = myLogs.reduce((acc, l) => acc + (parseInt(l.miscontrols || '0', 10) || 0), 0);
+      const unsuccessfulDribbles = myLogs.reduce((acc, l) => acc + (parseInt(l.unsuccessful_dribbles || '0', 10) || 0), 0);
+      const possessionLost = myLogs.reduce((acc, l) => acc + (parseInt(l.possession_lost || '0', 10) || 0), 0);
+      const offsides = myLogs.reduce((acc, l) => acc + (parseInt(l.offsides || '0', 10) || 0), 0);
+      const fouls = myLogs.reduce((acc, l) => acc + (parseInt(l.fouls || '0', 10) || 0), 0);
+      const yellowCards = myLogs.reduce((acc, l) => acc + (parseInt(l.yellow_cards || '0', 10) || 0), 0);
+      const redCards = myLogs.reduce((acc, l) => acc + (parseInt(l.red_cards || '0', 10) || 0), 0);
 
       return {
         id: assignedPlayerId || currentUser?.id || "my-player",
@@ -279,13 +311,43 @@ export default function MyPerformance({ currentUser, players = [], matches = [] 
         appearances: myLogs.length,
         totalPasses: totalPasses || rosterMatch?.totalPasses || 0,
         successfulPasses: compPasses || rosterMatch?.successfulPasses || 0,
-        defensiveDuels: tackles + interceptions || rosterMatch?.defensiveDuels || 0,
-        defensiveDuelsWon: tackles || rosterMatch?.defensiveDuelsWon || 0,
+        defensiveDuels: groundDuels || tackles + interceptions || rosterMatch?.defensiveDuels || 0,
+        defensiveDuelsWon: groundDuelsWon || tackles || rosterMatch?.defensiveDuelsWon || 0,
         shots: totalShots || rosterMatch?.shots || 0,
-        shotsOnTarget: Math.round(totalShots * 0.6) || rosterMatch?.shotsOnTarget || 0,
+        shotsOnTarget: totalSot || rosterMatch?.shotsOnTarget || 0,
         goals: totalGoals || rosterMatch?.goals || 0,
         assists: totalAssists || rosterMatch?.assists || 0,
-        interceptions: interceptions || rosterMatch?.interceptions || 0
+        interceptions: interceptions || rosterMatch?.interceptions || 0,
+        backwards_passes: backwardsPasses,
+        forwards_passes: forwardsPasses,
+        longPasses: longPasses,
+        successfulLongPasses: compLongPasses,
+        keyPasses: keyPasses,
+        successfulKeyPasses: compKeyPasses,
+        throughBalls: throughBalls,
+        successfulThroughBalls: compThroughBalls,
+        crosses: crosses,
+        successfulCrosses: compCrosses,
+        dribbles: dribbles,
+        successfulDribbles: compDribbles,
+        duels: duels,
+        duelsWon: duelsWon,
+        aerialDuels: aerialDuels,
+        aerialDuelsWon: aerialDuelsWon,
+        tackles: tackles,
+        tacklesWon: tacklesWon,
+        ballRecoveries: ballRecoveries,
+        clearances: clearances,
+        blocks: blocks,
+        own_goals: ownGoals,
+        turnovers: turnovers,
+        miscontrols: miscontrols,
+        unsuccessful_dribbles: unsuccessfulDribbles,
+        possession_lost: possessionLost,
+        offsides: offsides,
+        fouls: fouls,
+        yellow_cards: yellowCards,
+        red_cards: redCards
       };
     }
 
