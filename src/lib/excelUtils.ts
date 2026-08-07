@@ -280,6 +280,14 @@ export const parseMatchFixturesExcel = async (file: File): Promise<{ count: numb
     return isNaN(parsed) ? defaultVal : parsed;
   };
 
+  const extractFloat = (row: Record<string, any>, aliases: string[], defaultVal = 50): number => {
+    const strVal = extractString(row, aliases);
+    if (!strVal) return defaultVal;
+    const cleaned = strVal.replace(/[^0-9.-]/g, "");
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? defaultVal : parsed;
+  };
+
   const safeDivPct = (num: number, den: number): number => {
     if (!den || den === 0) return 0;
     return Number(((num / den) * 100).toFixed(1));
@@ -293,6 +301,7 @@ export const parseMatchFixturesExcel = async (file: File): Promise<{ count: numb
     const ourScore = extractInt(row, ['our_score', 'ourScore', 'Our Score', 'Goals For', 'goals']);
     const oppScore = extractInt(row, ['opponent_score', 'opponentScore', 'Opponent Score', 'Goals Against']);
     const status = extractString(row, ['status', 'Status']) || 'completed';
+    const possession = extractFloat(row, ['possession', 'Possession', 'possession_rate', 'possessionRate'], 50);
 
     return {
       id: matchId,
@@ -302,6 +311,7 @@ export const parseMatchFixturesExcel = async (file: File): Promise<{ count: numb
       our_score: ourScore,
       opponent_score: oppScore,
       status: status,
+      possession: possession,
 
       goals: extractInt(row, ['goals', 'Goals'], ourScore),
       shots: extractInt(row, ['shots', 'total_shots', 'totalShots', 'Shots']),
@@ -373,6 +383,7 @@ export const parseMatchFixturesExcel = async (file: File): Promise<{ count: numb
       status: 'completed',
 
       // OUR TEAM STATS
+      possession: Number(ourRow.possession || 50),
       goals: Number(ourRow.goals || 0),
       shots: Number(ourRow.shots || 0),
       shots_on_target: Number(ourRow.shots_on_target || 0),
@@ -413,6 +424,7 @@ export const parseMatchFixturesExcel = async (file: File): Promise<{ count: numb
       red_cards: Number(ourRow.red_cards || 0),
 
       // OPPONENT TEAM STATS (opp_ prefix)
+      opp_possession: Number(oppRow.possession || (100 - Number(ourRow.possession || 50))),
       opp_goals: Number(oppRow.goals || 0),
       opp_shots: Number(oppRow.shots || 0),
       opp_shots_on_target: Number(oppRow.shots_on_target || 0),
@@ -1348,6 +1360,7 @@ export class ExcelUtils {
       "our_score",
       "opponent_score",
       "status",
+      "possession",
       "goals",
       "shots",
       "shots_on_target",

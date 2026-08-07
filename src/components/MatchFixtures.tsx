@@ -394,8 +394,12 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
   const getMatchAnalysisData = () => {
     if (!selectedAnalysisFixture) return null;
     
-    const hTeam = selectedAnalysisFixture.homeTeam || "Cardiff Town FC";
-    const aTeam = selectedAnalysisFixture.awayTeam || selectedAnalysisFixture.opponent;
+    const isCardiffHome = selectedAnalysisFixture.venue === "Home" || 
+                          (selectedAnalysisFixture as any).home_away === "Home" ||
+                          selectedAnalysisFixture.homeTeam === "Cardiff Town FC";
+
+    const hTeam = isCardiffHome ? "Cardiff Town FC" : selectedAnalysisFixture.opponent;
+    const aTeam = isCardiffHome ? selectedAnalysisFixture.opponent : "Cardiff Town FC";
 
     // Match by ID first
     const targetMatch = allMatchData.find(m => 
@@ -405,42 +409,56 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
 
     const dateMatches = allMatchData.filter(m => m.date === selectedAnalysisFixture.date);
 
-    let homeData = targetMatch || dateMatches.find(m => m.teamName?.toLowerCase() === hTeam.toLowerCase());
-    let awayData = dateMatches.find(m => m.teamName?.toLowerCase() === aTeam.toLowerCase() && m.id !== homeData?.id);
+    let homeData: any = null;
+    let awayData: any = null;
 
-    if (!awayData && targetMatch) {
-      const oppGoals = (targetMatch as any).opp_goals ?? targetMatch.oppScore ?? targetMatch.opponent_score ?? 0;
-      const oppShots = (targetMatch as any).opp_shots ?? 0;
-      const oppShotsOnTarget = (targetMatch as any).opp_shots_on_target ?? 0;
-      const oppPasses = (targetMatch as any).opp_passes ?? 0;
-      const oppSuccessfulPasses = (targetMatch as any).opp_successful_passes ?? 0;
-      const oppTacklesAttempted = (targetMatch as any).opp_tackles ?? 0;
-      const oppTacklesWon = (targetMatch as any).opp_tackles_won ?? 0;
+    if (targetMatch) {
+      const ourGoals = (targetMatch as any).our_score ?? targetMatch.goals ?? 0;
+      const oppGoals = (targetMatch as any).opponent_score ?? (targetMatch as any).opp_goals ?? 0;
+      const ourPoss = (targetMatch as any).possession ?? targetMatch.possessionRate ?? 50;
+      const oppPoss = (targetMatch as any).opp_possession ?? (100 - Number(ourPoss));
 
-      awayData = {
+      const ourPackage = {
+        ...targetMatch,
+        goals: ourGoals,
+        possessionRate: Number(ourPoss),
+        shots: targetMatch.shots ?? 0,
+        shotsOnTarget: targetMatch.shotsOnTarget ?? targetMatch.shots_on_target ?? 0,
+        totalPasses: targetMatch.totalPasses ?? targetMatch.passes ?? 0,
+        successfulPasses: targetMatch.successfulPasses ?? targetMatch.successful_passes ?? 0,
+        tacklesAttempted: targetMatch.tacklesAttempted ?? targetMatch.tackles ?? 0,
+        tacklesWon: targetMatch.tacklesWon ?? targetMatch.tackles_won ?? 0,
+        interceptions: targetMatch.interceptions ?? 0,
+        clearances: targetMatch.clearances ?? 0
+      };
+
+      const oppPackage = {
+        ...targetMatch,
         id: `${targetMatch.id}_opp`,
         opponent: "Cardiff Town FC",
         isOpponentTeam: true,
-        date: targetMatch.date,
         goals: oppGoals,
-        shots: oppShots,
-        shotsOnTarget: oppShotsOnTarget,
-        totalPasses: oppPasses,
-        successfulPasses: oppSuccessfulPasses,
-        tacklesAttempted: oppTacklesAttempted,
-        tacklesWon: oppTacklesWon,
-        possessionRate: 100 - (targetMatch.possessionRate || 50)
-      } as any;
-    }
+        possessionRate: Number(oppPoss),
+        shots: (targetMatch as any).opp_shots ?? 0,
+        shotsOnTarget: (targetMatch as any).opp_shots_on_target ?? 0,
+        totalPasses: (targetMatch as any).opp_passes ?? 0,
+        successfulPasses: (targetMatch as any).opp_successful_passes ?? 0,
+        tacklesAttempted: (targetMatch as any).opp_tackles ?? 0,
+        tacklesWon: (targetMatch as any).opp_tackles_won ?? 0,
+        interceptions: (targetMatch as any).opp_interceptions ?? 0,
+        clearances: (targetMatch as any).opp_clearances ?? 0
+      };
 
-    if (!homeData) {
-      if (hTeam === "Cardiff Town FC") {
-        homeData = dateMatches.find(m => !m.isOpponentTeam) || targetMatch;
-        awayData = dateMatches.find(m => m.isOpponentTeam) || awayData;
+      if (isCardiffHome) {
+        homeData = ourPackage;
+        awayData = oppPackage;
       } else {
-        homeData = dateMatches[0] || targetMatch;
-        awayData = dateMatches[1] || awayData;
+        homeData = oppPackage;
+        awayData = ourPackage;
       }
+    } else {
+      homeData = dateMatches.find(m => m.teamName?.toLowerCase() === hTeam.toLowerCase());
+      awayData = dateMatches.find(m => m.teamName?.toLowerCase() === aTeam.toLowerCase() && m.id !== homeData?.id);
     }
 
     return { homeData, awayData, hTeam, aTeam };
@@ -817,7 +835,7 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
               <thead className="bg-[#0f172a] text-[#94a3b8] uppercase font-mono text-[10px] tracking-wider border-b border-[#334155]">
                 <tr>
                   <th className="py-3 px-4">Date & Comp</th>
-                  <th className="py-3 px-4">Matchup (Away vs Home)</th>
+                  <th className="py-3 px-4">Matchup (Home vs Away)</th>
                   <th className="py-3 px-4">Venue</th>
                   <th className="py-3 px-4 text-center">Result / Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
@@ -825,18 +843,20 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
               </thead>
               <tbody className="divide-y divide-[#334155]">
                 {filteredFixtures.map((f) => {
+                  const isCardiffHome = f.venue === "Home" || (f as any).home_away === "Home" || f.homeTeam === "Cardiff Town FC";
+                  const homeTeam = isCardiffHome ? "Cardiff Town FC" : f.opponent;
+                  const awayTeam = isCardiffHome ? f.opponent : "Cardiff Town FC";
+
                   const rawOurScore = (f as any).our_score ?? (f as any).goals ?? f.ourScore;
                   const rawOppScore = (f as any).opponent_score ?? (f as any).opp_goals ?? f.oppScore;
                   const hasScore = (rawOurScore !== undefined && rawOurScore !== null) && 
                                    (rawOppScore !== undefined && rawOppScore !== null);
                   const isPlayed = f.status === "Played" || f.status === "Completed" || f.status === "completed" || hasScore;
 
-                  const awayTeam = f.awayTeam || (f.venue === "Away" ? "Cardiff Town FC" : f.opponent);
-                  const homeTeam = f.homeTeam || (f.venue === "Home" ? "Cardiff Town FC" : f.opponent);
                   const displayOurScore = rawOurScore ?? 0;
                   const displayOppScore = rawOppScore ?? 0;
-                  const awayScore = f.awayScore !== undefined ? f.awayScore : (f.venue === "Away" ? displayOurScore : displayOppScore);
-                  const homeScore = f.homeScore !== undefined ? f.homeScore : (f.venue === "Home" ? displayOurScore : displayOppScore);
+                  const homeScore = isCardiffHome ? displayOurScore : displayOppScore;
+                  const awayScore = isCardiffHome ? displayOppScore : displayOurScore;
 
                   return (
                     <tr 
@@ -864,12 +884,12 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                         </div>
                       </td>
 
-                      {/* Matchup */}
+                      {/* Matchup (Home vs Away) */}
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2 font-bold text-white">
-                          <span className="truncate max-w-[100px] sm:max-w-[140px]">{awayTeam}</span>
+                          <span className="truncate max-w-[100px] sm:max-w-[140px] text-white" title={homeTeam}>{homeTeam}</span>
                           <span className="text-[10px] text-[#94a3b8] font-mono">vs</span>
-                          <span className="truncate max-w-[100px] sm:max-w-[140px]">{homeTeam}</span>
+                          <span className="truncate max-w-[100px] sm:max-w-[140px] text-slate-300" title={awayTeam}>{awayTeam}</span>
                         </div>
                       </td>
 
@@ -883,7 +903,7 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                         {isPlayed || hasScore ? (
                           <div className="flex flex-col items-center gap-1">
                             <div className="border border-amber-500/50 bg-slate-900/80 px-3 py-1 rounded text-center font-bold text-amber-400 font-mono text-sm shadow-xs inline-flex items-center gap-1.5">
-                              {hasScore ? `${displayOurScore} : ${displayOppScore}` : '- : -'}
+                              {hasScore ? `${homeScore} : ${awayScore}` : '- : -'}
                             </div>
                             <span className="inline-flex items-center gap-1 text-[9px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
                               <CheckCircle className="h-2.5 w-2.5 shrink-0" />
@@ -999,11 +1019,20 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
         /* Card Grid Layout */
         <div className="grid gap-4 sm:grid-cols-2" id="fixtures-grid">
           {filteredFixtures.map((f) => {
-            const isPlayed = f.status === "Played" || f.status === "Completed" || f.status === "completed" || f.ourScore !== undefined;
-            const awayTeam = f.awayTeam || (f.venue === "Away" ? "Cardiff Town FC" : f.opponent);
-            const homeTeam = f.homeTeam || (f.venue === "Home" ? "Cardiff Town FC" : f.opponent);
-            const awayScore = f.awayScore !== undefined ? f.awayScore : (f.venue === "Away" ? (f.ourScore ?? 0) : (f.oppScore ?? 0));
-            const homeScore = f.homeScore !== undefined ? f.homeScore : (f.venue === "Home" ? (f.ourScore ?? 0) : (f.oppScore ?? 0));
+            const isCardiffHome = f.venue === "Home" || (f as any).home_away === "Home" || f.homeTeam === "Cardiff Town FC";
+            const homeTeam = isCardiffHome ? "Cardiff Town FC" : f.opponent;
+            const awayTeam = isCardiffHome ? f.opponent : "Cardiff Town FC";
+
+            const rawOurScore = (f as any).our_score ?? (f as any).goals ?? f.ourScore;
+            const rawOppScore = (f as any).opponent_score ?? (f as any).opp_goals ?? f.oppScore;
+            const hasScore = (rawOurScore !== undefined && rawOurScore !== null) && 
+                             (rawOppScore !== undefined && rawOppScore !== null);
+            const isPlayed = f.status === "Played" || f.status === "Completed" || f.status === "completed" || hasScore;
+
+            const displayOurScore = rawOurScore ?? 0;
+            const displayOppScore = rawOppScore ?? 0;
+            const homeScore = isCardiffHome ? displayOurScore : displayOppScore;
+            const awayScore = isCardiffHome ? displayOppScore : displayOppScore;
 
             return (
               <div 
@@ -1042,18 +1071,16 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                 <div className="space-y-3.5 mb-3">
                   <div className="grid grid-cols-7 items-center gap-1">
                     <div className="col-span-3 flex items-center justify-end gap-2 text-right">
-                      <span className="text-xs sm:text-sm font-bold text-white truncate max-w-[90px] sm:max-w-none" title={awayTeam}>
-                        {awayTeam}
+                      <span className="text-xs sm:text-sm font-bold text-white truncate max-w-[90px] sm:max-w-none" title={homeTeam}>
+                        {homeTeam}
                       </span>
-                      <TeamLogo teamName={awayTeam} size={24} className="rounded-md shrink-0 bg-[#0b0f19] p-0.5" />
+                      <TeamLogo teamName={homeTeam} size={24} className="rounded-md shrink-0 bg-[#0b0f19] p-0.5" />
                     </div>
 
                     <div className="col-span-1 flex items-center justify-center text-center">
-                      {isPlayed ? (
-                        <div className="flex items-center gap-1 bg-[#0b0f19] text-white px-2.5 py-1 rounded-lg border border-emerald-500/40 font-mono font-black text-sm shadow-xs">
-                          <span className={awayScore > homeScore ? "text-emerald-400 font-extrabold" : "text-white"}>{awayScore}</span>
-                          <span className="text-[#94a3b8]">:</span>
-                          <span className={homeScore > awayScore ? "text-emerald-400 font-extrabold" : "text-white"}>{homeScore}</span>
+                      {isPlayed || hasScore ? (
+                        <div className="border border-amber-500/50 bg-slate-900/80 px-2 py-1 rounded text-center font-bold text-amber-400 font-mono text-xs shadow-xs inline-flex items-center gap-1">
+                          {hasScore ? `${homeScore} : ${awayScore}` : '- : -'}
                         </div>
                       ) : (
                         <span className="text-[9px] text-[#94a3b8] font-black bg-[#0b0f19] border border-[#334155] px-2 py-0.5 rounded-md uppercase font-mono">
@@ -1063,9 +1090,9 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                     </div>
 
                     <div className="col-span-3 flex items-center justify-start gap-2 text-left">
-                      <TeamLogo teamName={homeTeam} size={24} className="rounded-md shrink-0 bg-[#0b0f19] p-0.5" />
-                      <span className="text-xs sm:text-sm font-bold text-white truncate max-w-[90px] sm:max-w-none" title={homeTeam}>
-                        {homeTeam}
+                      <TeamLogo teamName={awayTeam} size={24} className="rounded-md shrink-0 bg-[#0b0f19] p-0.5" />
+                      <span className="text-xs sm:text-sm font-bold text-slate-300 truncate max-w-[90px] sm:max-w-none" title={awayTeam}>
+                        {awayTeam}
                       </span>
                     </div>
                   </div>
