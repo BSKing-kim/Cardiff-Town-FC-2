@@ -444,7 +444,11 @@ export class DataService {
 
     try {
       if (reassigned.length > 0) {
-        await supabase.from("matches").upsert(this.sanitizeForSupabase(reassigned));
+        const { error: matchesErr } = await (supabase.from("matches") as any).upsert(this.sanitizeForSupabase(reassigned));
+        if (matchesErr) {
+          console.warn("Supabase matches upsert warning (falling back to match_fixtures):", matchesErr.message);
+          await (supabase.from("match_fixtures") as any).upsert(this.sanitizeForSupabase(reassigned));
+        }
       }
     } catch (e) {
       console.warn("Supabase save matches failed:", e);

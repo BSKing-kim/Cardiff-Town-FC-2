@@ -1,10 +1,7 @@
 import React, { useState } from "react";
-import { ExcelUtils } from "../lib/excelUtils";
-import { supabase } from "../lib/supabase";
-import { DataService } from "../lib/dataService";
+import { ExcelUtils, parseMatchFixturesExcel } from "../lib/excelUtils";
 import { Download, Upload, Calendar, CheckCircle2, AlertTriangle } from "lucide-react";
 import { UserProfile, UserRole } from "../types";
-import * as XLSX from "xlsx";
 
 interface MatchFixturesBulkImportProps {
   currentUser?: UserProfile | null;
@@ -32,184 +29,10 @@ export default function MatchFixturesBulkImport({ currentUser, onImportSuccess }
     setStatus(null);
 
     try {
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: 'array' });
-
-      if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
-        throw new Error("Excel file is empty or missing valid sheets.");
-      }
-
-      const sheetName = workbook.SheetNames[0];
-      const rawRows: Record<string, any>[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: '' });
-
-      if (!rawRows || rawRows.length === 0) {
-        throw new Error("Excel file is empty or missing valid rows.");
-      }
-
-      const extractString = (row: Record<string, any>, aliases: string[]): string => {
-        const normAliases = aliases.map(a => a.toLowerCase().replace(/[^a-z0-9]/g, ""));
-        for (const [key, val] of Object.entries(row)) {
-          const normKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
-          if (normAliases.includes(normKey)) {
-            const strVal = String(val !== undefined && val !== null ? val : "").trim();
-            if (strVal !== "") return strVal;
-          }
-        }
-        return "";
-      };
-
-      const extractInt = (row: Record<string, any>, aliases: string[], defaultVal = 0): number => {
-        const strVal = extractString(row, aliases);
-        if (!strVal) return defaultVal;
-        const cleaned = strVal.replace(/[^0-9.-]/g, "");
-        const parsed = parseInt(cleaned, 10);
-        return isNaN(parsed) ? defaultVal : parsed;
-      };
-
-      const safeDivPct = (num: number, den: number): number => {
-        if (!den || den === 0) return 0;
-        return Number(((num / den) * 100).toFixed(1));
-      };
-
-      const sanitizedMatches = rawRows.map(row => {
-        const matchId = extractString(row, ['match_id', 'Match ID', 'Game ID', 'ID']) || `M-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
-        const date = extractString(row, ['date', 'Date', 'Match Date']) || new Date().toISOString().split('T')[0];
-        const opponent = extractString(row, ['opponent', 'Opponent', 'Opponent Team', 'VS']) || 'Opponent Team';
-        const homeAway = extractString(row, ['home_away', 'Home/Away', 'Venue']) || 'Home';
-        const ourScore = extractInt(row, ['our_score', 'Our Score', 'Goals For', 'goals']);
-        const oppScore = extractInt(row, ['opponent_score', 'Opponent Score', 'Goals Against']);
-        const matchStatus = extractString(row, ['status', 'Status']) || 'Finished';
-
-        const goals = extractInt(row, ['goals', 'Goals'], ourScore);
-        const shots = extractInt(row, ['shots', 'Shots', 'total_shots']);
-        const shotsOnTarget = extractInt(row, ['shots_on_target', 'Shots On Target', 'sot']);
-
-        const passes = extractInt(row, ['passes', 'Passes', 'total_passes']);
-        const successfulPasses = extractInt(row, ['successful_passes', 'Successful Passes', 'completed_passes']);
-        const backwardsPasses = extractInt(row, ['backwards_passes', 'Backwards Passes', 'backward_passes']);
-        const forwardsPasses = extractInt(row, ['forwards_passes', 'Forwards Passes', 'forward_passes']);
-        const longPasses = extractInt(row, ['long_passes', 'Long Passes']);
-        const successfulLongPasses = extractInt(row, ['successful_long_passes', 'Successful Long Passes']);
-        const keyPasses = extractInt(row, ['key_passes', 'Key Passes']);
-        const successfulKeyPasses = extractInt(row, ['successful_key_passes', 'Successful Key Passes']);
-        const throughBalls = extractInt(row, ['through_balls', 'Through Balls']);
-        const successfulThroughBalls = extractInt(row, ['successful_through_balls', 'Successful Through Balls']);
-        const crosses = extractInt(row, ['crosses', 'Crosses']);
-        const successfulCrosses = extractInt(row, ['successful_crosses', 'Successful Crosses']);
-
-        const dribbles = extractInt(row, ['dribbles', 'Dribbles']);
-        const successfulDribbles = extractInt(row, ['successful_dribbles', 'Successful Dribbles']);
-        const duels = extractInt(row, ['duels', 'Duels']);
-        const duelsWon = extractInt(row, ['duels_won', 'Duels Won']);
-        const aerialDuels = extractInt(row, ['aerial_duels', 'Aerial Duels']);
-        const aerialDuelsWon = extractInt(row, ['aerial_duels_won', 'Aerial Duels Won']);
-        const groundDuels = extractInt(row, ['ground_duels', 'Ground Duels']);
-        const groundDuelsWon = extractInt(row, ['ground_duels_won', 'Ground Duels Won']);
-
-        const ballRecoveries = extractInt(row, ['ball_recoveries', 'Ball Recoveries', 'recoveries']);
-        const tackles = extractInt(row, ['tackles', 'Tackles']);
-        const tacklesWon = extractInt(row, ['tackles_won', 'Tackles Won']);
-        const interceptions = extractInt(row, ['interceptions', 'Interceptions']);
-        const clearances = extractInt(row, ['clearances', 'Clearances']);
-        const blocks = extractInt(row, ['blocks', 'Blocks']);
-
-        const ownGoals = extractInt(row, ['own_goals', 'Own Goals']);
-        const turnovers = extractInt(row, ['turnovers', 'Turnovers']);
-        const miscontrols = extractInt(row, ['miscontrols', 'Miscontrols']);
-        const unsuccessfulDribbles = extractInt(row, ['unsuccessful_dribbles', 'Unsuccessful Dribbles']);
-        const possessionLost = extractInt(row, ['possession_lost', 'Possession Lost']);
-        const offsides = extractInt(row, ['offsides', 'Offsides']);
-        const fouls = extractInt(row, ['fouls', 'Fouls']);
-        const yellowCards = extractInt(row, ['yellow_cards', 'Yellow Cards']);
-        const redCards = extractInt(row, ['red_cards', 'Red Cards']);
-
-        // Auto-calculate accuracy & win percentages
-        const shotAccuracy = safeDivPct(shotsOnTarget, shots);
-        const passAccuracy = safeDivPct(successfulPasses, passes);
-        const duelWonPct = safeDivPct(duelsWon, duels);
-        const tackleWonPct = safeDivPct(tacklesWon, tackles);
-        const longPassSucPct = safeDivPct(successfulLongPasses, longPasses);
-        const keyPassSucPct = safeDivPct(successfulKeyPasses, keyPasses);
-        const throughBallSucPct = safeDivPct(successfulThroughBalls, throughBalls);
-        const crossSucPct = safeDivPct(successfulCrosses, crosses);
-        const dribbleSucPct = safeDivPct(successfulDribbles, dribbles);
-
-        return {
-          id: matchId,
-          match_id: matchId,
-          date: date,
-          opponent: opponent,
-          venue: homeAway,
-          our_score: ourScore,
-          opp_score: oppScore,
-          result: `${ourScore > oppScore ? 'W' : ourScore < oppScore ? 'L' : 'D'} (${ourScore}-${oppScore})`,
-          status: matchStatus,
-          goals,
-          shots,
-          shots_on_target: shotsOnTarget,
-          passes,
-          successful_passes: successfulPasses,
-          backwards_passes: backwardsPasses,
-          forwards_passes: forwardsPasses,
-          long_passes: longPasses,
-          successful_long_passes: successfulLongPasses,
-          key_passes: keyPasses,
-          successful_key_passes: successfulKeyPasses,
-          through_balls: throughBalls,
-          successful_through_balls: successfulThroughBalls,
-          crosses,
-          successful_crosses: successfulCrosses,
-          dribbles,
-          successful_dribbles: successfulDribbles,
-          duels,
-          duels_won: duelsWon,
-          aerial_duels: aerialDuels,
-          aerial_duels_won: aerialDuelsWon,
-          ground_duels: groundDuels,
-          ground_duels_won: groundDuelsWon,
-          ball_recoveries: ballRecoveries,
-          tackles,
-          tackles_won: tacklesWon,
-          interceptions,
-          clearances,
-          blocks,
-          own_goals: ownGoals,
-          turnovers,
-          miscontrols,
-          unsuccessful_dribbles: unsuccessfulDribbles,
-          possession_lost: possessionLost,
-          offsides,
-          fouls,
-          yellow_cards: yellowCards,
-          red_cards: redCards,
-          shot_accuracy: shotAccuracy,
-          pass_accuracy: passAccuracy,
-          duel_won_pct: duelWonPct,
-          tackle_won_pct: tackleWonPct,
-          long_pass_suc_pct: longPassSucPct,
-          key_pass_suc_pct: keyPassSucPct,
-          through_ball_suc_pct: throughBallSucPct,
-          cross_suc_pct: crossSucPct,
-          dribble_suc_pct: dribbleSucPct,
-          created_at: new Date().toISOString()
-        };
-      }).filter(r => r.opponent !== '');
-
-      if (sanitizedMatches.length === 0) {
-        throw new Error("No valid match fixture entries found in Excel file.");
-      }
-
-      try {
-        const { error } = await (supabase.from('matches') as any)
-          .upsert(sanitizedMatches, { onConflict: 'id' });
-        if (error) console.warn("matches upsert warning:", error.message);
-      } catch (e) {
-        console.warn("matches exception:", e);
-      }
-
+      const res = await parseMatchFixturesExcel(file);
       setStatus({
         success: true,
-        message: `Successfully uploaded & updated ${sanitizedMatches.length} match fixture schedules into Supabase.`
+        message: `Successfully uploaded & updated ${res.count} match fixture schedules into Supabase database.`
       });
 
       if (onImportSuccess) onImportSuccess();
@@ -250,10 +73,10 @@ export default function MatchFixturesBulkImport({ currentUser, onImportSuccess }
           </div>
           <div>
             <h3 className="font-display font-black text-sm text-white uppercase tracking-wider">
-              Match Fixture Bulk Import
+              Match Fixture Bulk Import (Fixtures Page)
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Batch update fixture schedules, scores, team possession, and match results using Match_Fixtures_Template.xlsx.
+              Batch upload match fixture schedules, team scores, and match statistics directly into public.matches using Match_Fixtures_Template.xlsx.
             </p>
           </div>
         </div>
@@ -292,7 +115,7 @@ export default function MatchFixturesBulkImport({ currentUser, onImportSuccess }
           </div>
           <div>
             <p className="text-xs font-bold text-white">
-              {isUploading ? "Uploading Match Fixtures..." : "Click or Drag & Drop Match Fixtures Excel File"}
+              {isUploading ? "Uploading Match Fixtures to Supabase..." : "Click or Drag & Drop Match Fixtures Excel File"}
             </p>
             <p className="text-[11px] text-slate-400 mt-0.5">
               Supports .xlsx, .xls, or .csv pre-formatted files

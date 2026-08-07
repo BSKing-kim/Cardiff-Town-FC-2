@@ -239,6 +239,397 @@ export const parseAndUploadExcel = async (
   return { count: 0, data: [] };
 };
 
+// Explicit standalone parser for Match Fixtures (Matches table) - NO check for Player Name or Player ID
+export const parseMatchFixturesExcel = async (file: File): Promise<{ count: number; data: any[] }> => {
+  if (!file) {
+    throw new Error("No file provided for Match Fixtures Excel upload.");
+  }
+
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array' });
+
+  if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
+    throw new Error("Excel file is empty or missing valid sheets.");
+  }
+
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  const rawRows: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+  if (!rawRows || rawRows.length === 0) {
+    throw new Error("Excel file is empty or missing valid rows.");
+  }
+
+  const extractString = (row: Record<string, any>, aliases: string[]): string => {
+    const normAliases = aliases.map(a => a.toLowerCase().replace(/[^a-z0-9]/g, ""));
+    for (const [key, val] of Object.entries(row)) {
+      const normKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (normAliases.includes(normKey)) {
+        const strVal = String(val !== undefined && val !== null ? val : "").trim();
+        if (strVal !== "") return strVal;
+      }
+    }
+    return "";
+  };
+
+  const extractInt = (row: Record<string, any>, aliases: string[], defaultVal = 0): number => {
+    const strVal = extractString(row, aliases);
+    if (!strVal) return defaultVal;
+    const cleaned = strVal.replace(/[^0-9.-]/g, "");
+    const parsed = parseInt(cleaned, 10);
+    return isNaN(parsed) ? defaultVal : parsed;
+  };
+
+  const safeDivPct = (num: number, den: number): number => {
+    if (!den || den === 0) return 0;
+    return Number(((num / den) * 100).toFixed(1));
+  };
+
+  const sanitizedMatches = rawRows.map(row => {
+    const matchId = extractString(row, ['match_id', 'Match ID', 'Game ID', 'ID']) || `M-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    const date = extractString(row, ['date', 'Date', 'Match Date']) || new Date().toISOString().split('T')[0];
+    const opponent = extractString(row, ['opponent', 'Opponent', 'Opponent Team', 'VS']) || 'Opponent Team';
+    const homeAway = extractString(row, ['home_away', 'Home/Away', 'Venue', 'homeAway']) || 'Home';
+    const ourScore = extractInt(row, ['our_score', 'Our Score', 'Goals For', 'goals', 'ourScore']);
+    const oppScore = extractInt(row, ['opponent_score', 'Opponent Score', 'Goals Against', 'oppScore']);
+    const matchStatus = extractString(row, ['status', 'Status']) || 'Finished';
+
+    const goals = extractInt(row, ['goals', 'Goals'], ourScore);
+    const shots = extractInt(row, ['shots', 'Shots', 'total_shots']);
+    const shotsOnTarget = extractInt(row, ['shots_on_target', 'Shots On Target', 'sot']);
+
+    const passes = extractInt(row, ['passes', 'Passes', 'total_passes']);
+    const successfulPasses = extractInt(row, ['successful_passes', 'Successful Passes', 'completed_passes']);
+    const backwardsPasses = extractInt(row, ['backwards_passes', 'Backwards Passes', 'backward_passes']);
+    const forwardsPasses = extractInt(row, ['forwards_passes', 'Forwards Passes', 'forward_passes']);
+    const longPasses = extractInt(row, ['long_passes', 'Long Passes']);
+    const successfulLongPasses = extractInt(row, ['successful_long_passes', 'Successful Long Passes']);
+    const keyPasses = extractInt(row, ['key_passes', 'Key Passes']);
+    const successfulKeyPasses = extractInt(row, ['successful_key_passes', 'Successful Key Passes']);
+    const throughBalls = extractInt(row, ['through_balls', 'Through Balls']);
+    const successfulThroughBalls = extractInt(row, ['successful_through_balls', 'Successful Through Balls']);
+    const crosses = extractInt(row, ['crosses', 'Crosses']);
+    const successfulCrosses = extractInt(row, ['successful_crosses', 'Successful Crosses']);
+
+    const dribbles = extractInt(row, ['dribbles', 'Dribbles']);
+    const successfulDribbles = extractInt(row, ['successful_dribbles', 'Successful Dribbles']);
+    const duels = extractInt(row, ['duels', 'Duels']);
+    const duelsWon = extractInt(row, ['duels_won', 'Duels Won']);
+    const aerialDuels = extractInt(row, ['aerial_duels', 'Aerial Duels']);
+    const aerialDuelsWon = extractInt(row, ['aerial_duels_won', 'Aerial Duels Won']);
+    const groundDuels = extractInt(row, ['ground_duels', 'Ground Duels']);
+    const groundDuelsWon = extractInt(row, ['ground_duels_won', 'Ground Duels Won']);
+
+    const ballRecoveries = extractInt(row, ['ball_recoveries', 'Ball Recoveries', 'recoveries']);
+    const tackles = extractInt(row, ['tackles', 'Tackles']);
+    const tacklesWon = extractInt(row, ['tackles_won', 'Tackles Won']);
+    const interceptions = extractInt(row, ['interceptions', 'Interceptions']);
+    const clearances = extractInt(row, ['clearances', 'Clearances']);
+    const blocks = extractInt(row, ['blocks', 'Blocks']);
+
+    const ownGoals = extractInt(row, ['own_goals', 'Own Goals']);
+    const turnovers = extractInt(row, ['turnovers', 'Turnovers']);
+    const miscontrols = extractInt(row, ['miscontrols', 'Miscontrols']);
+    const unsuccessfulDribbles = extractInt(row, ['unsuccessful_dribbles', 'Unsuccessful Dribbles']);
+    const possessionLost = extractInt(row, ['possession_lost', 'Possession Lost']);
+    const offsides = extractInt(row, ['offsides', 'Offsides']);
+    const fouls = extractInt(row, ['fouls', 'Fouls']);
+    const yellowCards = extractInt(row, ['yellow_cards', 'Yellow Cards']);
+    const redCards = extractInt(row, ['red_cards', 'Red Cards']);
+
+    const shotAccuracy = safeDivPct(shotsOnTarget, shots);
+    const passAccuracy = safeDivPct(successfulPasses, passes);
+    const duelWonPct = safeDivPct(duelsWon, duels);
+    const tackleWonPct = safeDivPct(tacklesWon, tackles);
+
+    return {
+      id: matchId,
+      match_id: matchId,
+      date,
+      opponent,
+      venue: homeAway,
+      our_score: ourScore,
+      opp_score: oppScore,
+      result: `${ourScore > oppScore ? 'W' : ourScore < oppScore ? 'L' : 'D'} (${ourScore}-${oppScore})`,
+      status: matchStatus,
+      goals,
+      shots,
+      shots_on_target: shotsOnTarget,
+      passes,
+      successful_passes: successfulPasses,
+      backwards_passes: backwardsPasses,
+      forwards_passes: forwardsPasses,
+      long_passes: longPasses,
+      successful_long_passes: successfulLongPasses,
+      key_passes: keyPasses,
+      successful_key_passes: successfulKeyPasses,
+      through_balls: throughBalls,
+      successful_through_balls: successfulThroughBalls,
+      crosses,
+      successful_crosses: successfulCrosses,
+      dribbles,
+      successful_dribbles: successfulDribbles,
+      duels,
+      duels_won: duelsWon,
+      aerial_duels: aerialDuels,
+      aerial_duels_won: aerialDuelsWon,
+      ground_duels: groundDuels,
+      ground_duels_won: groundDuelsWon,
+      ball_recoveries: ballRecoveries,
+      tackles,
+      tackles_won: tacklesWon,
+      interceptions,
+      clearances,
+      blocks,
+      own_goals: ownGoals,
+      turnovers,
+      miscontrols,
+      unsuccessful_dribbles: unsuccessfulDribbles,
+      possession_lost: possessionLost,
+      offsides,
+      fouls,
+      yellow_cards: yellowCards,
+      red_cards: redCards,
+      shot_accuracy: shotAccuracy,
+      pass_accuracy: passAccuracy,
+      duel_won_pct: duelWonPct,
+      tackle_won_pct: tackleWonPct,
+      created_at: new Date().toISOString()
+    };
+  }).filter(r => r.match_id !== '' || r.opponent !== '');
+
+  if (sanitizedMatches.length === 0) {
+    throw new Error("No valid match fixture entries found in file.");
+  }
+
+  // Primary target: public.matches
+  const { error: matchesErr } = await (supabase.from('matches') as any)
+    .upsert(sanitizedMatches, { onConflict: 'id' });
+
+  if (matchesErr) {
+    console.warn("Supabase matches upsert warning (falling back to match_fixtures):", matchesErr.message);
+    const { error: fallbackErr } = await (supabase.from('match_fixtures') as any)
+      .upsert(sanitizedMatches, { onConflict: 'id' });
+
+    if (fallbackErr) {
+      console.warn("Supabase match_fixtures upsert warning:", fallbackErr.message);
+    }
+  }
+
+  // Mirror to DataService
+  await DataService.saveMatches(sanitizedMatches.map(m => DataService.migrateMatch({
+    id: m.id,
+    date: m.date,
+    opponent: m.opponent,
+    venue: m.venue as any,
+    ourScore: m.our_score,
+    oppScore: m.opp_score,
+    result: m.result,
+    status: m.status as any,
+    totalShots: m.shots,
+    shotsOnTarget: m.shots_on_target,
+    corners: 0,
+    isOpponentTeam: false,
+    ...m
+  })));
+
+  return { count: sanitizedMatches.length, data: sanitizedMatches };
+};
+
+// Explicit standalone parser for Individual Player Stats (player_stats table)
+export const parsePlayerStatsExcel = async (file: File): Promise<{ count: number; data: any[] }> => {
+  if (!file) {
+    throw new Error("No file provided for Player Stats Excel upload.");
+  }
+
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array' });
+
+  if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
+    throw new Error("Excel file is empty or missing valid sheets.");
+  }
+
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  const rawRows: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+  if (!rawRows || rawRows.length === 0) {
+    throw new Error("Excel file is empty or missing valid rows.");
+  }
+
+  const { data: profiles } = await (supabase.from('profiles') as any).select('*');
+  const profileMap = new Map<string, any>();
+  if (profiles && Array.isArray(profiles)) {
+    profiles.forEach((p: any) => {
+      if (p.username) profileMap.set(String(p.username).trim().toLowerCase(), p);
+      if (p.full_name) profileMap.set(String(p.full_name).trim().toLowerCase(), p);
+    });
+  }
+
+  const extractString = (row: Record<string, any>, aliases: string[]): string => {
+    const normAliases = aliases.map(a => a.toLowerCase().replace(/[^a-z0-9]/g, ""));
+    for (const [key, val] of Object.entries(row)) {
+      const normKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (normAliases.includes(normKey)) {
+        const strVal = String(val !== undefined && val !== null ? val : "").trim();
+        if (strVal !== "") return strVal;
+      }
+    }
+    return "";
+  };
+
+  const extractInt = (row: Record<string, any>, aliases: string[], defaultVal = 0): number => {
+    const strVal = extractString(row, aliases);
+    if (!strVal) return defaultVal;
+    const cleaned = strVal.replace(/[^0-9.-]/g, "");
+    const parsed = parseInt(cleaned, 10);
+    return isNaN(parsed) ? defaultVal : parsed;
+  };
+
+  const sanitizedRows = rawRows.map(row => {
+    const username = extractString(row, ['username', 'Username', 'User Name', 'player_name', 'Player Name', '선수명']);
+    const matchId = extractString(row, ['match_id', 'Match ID', 'Game ID', 'Match', '매치ID']) || 'M01';
+    
+    if (!username && !matchId) return null;
+
+    const matchedProfile = profileMap.get(username.toLowerCase());
+    const playerId = matchedProfile?.player_id || matchedProfile?.id || matchedProfile?.user_id || `PLR-${username.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+    const playerName = matchedProfile?.full_name || username || 'Player';
+
+    const goals = extractInt(row, ['goals', 'Goals']);
+    const shots = extractInt(row, ['shots', 'Shots']);
+    const shotsOnTarget = extractInt(row, ['shots_on_target', 'Shots On Target', 'sot']);
+
+    const passes = extractInt(row, ['passes', 'Passes', 'total_passes']);
+    const successfulPasses = extractInt(row, ['successful_passes', 'Successful Passes', 'completed_passes']);
+    const backwardsPasses = extractInt(row, ['backwards_passes', 'Backwards Passes', 'backward_passes']);
+    const forwardsPasses = extractInt(row, ['forwards_passes', 'Forwards Passes', 'forward_passes']);
+    const longPasses = extractInt(row, ['long_passes', 'Long Passes']);
+    const successfulLongPasses = extractInt(row, ['successful_long_passes', 'Successful Long Passes']);
+    const keyPasses = extractInt(row, ['key_passes', 'Key Passes']);
+    const successfulKeyPasses = extractInt(row, ['successful_key_passes', 'Successful Key Passes']);
+    const throughBalls = extractInt(row, ['through_balls', 'Through Balls']);
+    const successfulThroughBalls = extractInt(row, ['successful_through_balls', 'Successful Through Balls']);
+    const crosses = extractInt(row, ['crosses', 'Crosses']);
+    const successfulCrosses = extractInt(row, ['successful_crosses', 'Successful Crosses']);
+
+    const dribbles = extractInt(row, ['dribbles', 'Dribbles']);
+    const successfulDribbles = extractInt(row, ['successful_dribbles', 'Successful Dribbles']);
+    const duels = extractInt(row, ['duels', 'Duels']);
+    const duelsWon = extractInt(row, ['duels_won', 'Duels Won']);
+    const aerialDuels = extractInt(row, ['aerial_duels', 'Aerial Duels']);
+    const aerialDuelsWon = extractInt(row, ['aerial_duels_won', 'Aerial Duels Won']);
+    const groundDuels = extractInt(row, ['ground_duels', 'Ground Duels']);
+    const groundDuelsWon = extractInt(row, ['ground_duels_won', 'Ground Duels Won']);
+
+    const tackles = extractInt(row, ['tackles', 'Tackles']);
+    const tacklesWon = extractInt(row, ['tackles_won', 'Tackles Won']);
+    const ballRecoveries = extractInt(row, ['ball_recoveries', 'Ball Recoveries', 'recoveries']);
+    const interceptions = extractInt(row, ['interceptions', 'Interceptions']);
+    const clearances = extractInt(row, ['clearances', 'Clearances']);
+    const blocks = extractInt(row, ['blocks', 'Blocks']);
+
+    const ownGoals = extractInt(row, ['own_goals', 'Own Goals']);
+    const turnovers = extractInt(row, ['turnovers', 'Turnovers']);
+    const miscontrols = extractInt(row, ['miscontrols', 'Miscontrols']);
+    const unsuccessfulDribbles = extractInt(row, ['unsuccessful_dribbles', 'Unsuccessful Dribbles']);
+    const possessionLost = extractInt(row, ['possession_lost', 'Possession Lost']);
+    const offsides = extractInt(row, ['offsides', 'Offsides']);
+    const fouls = extractInt(row, ['fouls', 'Fouls']);
+    const yellowCards = extractInt(row, ['yellow_cards', 'Yellow Cards']);
+    const redCards = extractInt(row, ['red_cards', 'Red Cards']);
+
+    const recId = `${matchId}_${username.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+
+    return {
+      id: recId,
+      match_id: matchId,
+      player_id: playerId,
+      player_name: playerName,
+      username: username,
+      goals,
+      shots,
+      shots_on_target: shotsOnTarget,
+      passes,
+      total_passes: passes,
+      successful_passes: successfulPasses,
+      completed_passes: successfulPasses,
+      backwards_passes: backwardsPasses,
+      forwards_passes: forwardsPasses,
+      long_passes: longPasses,
+      successful_long_passes: successfulLongPasses,
+      key_passes: keyPasses,
+      successful_key_passes: successfulKeyPasses,
+      through_balls: throughBalls,
+      successful_through_balls: successfulThroughBalls,
+      crosses,
+      successful_crosses: successfulCrosses,
+      dribbles,
+      successful_dribbles: successfulDribbles,
+      duels,
+      duels_won: duelsWon,
+      aerial_duels: aerialDuels,
+      aerial_duels_won: aerialDuelsWon,
+      ground_duels: groundDuels,
+      ground_duels_won: groundDuelsWon,
+      tackles,
+      tackles_won: tacklesWon,
+      ball_recoveries: ballRecoveries,
+      interceptions,
+      clearances,
+      blocks,
+      own_goals: ownGoals,
+      turnovers,
+      miscontrols,
+      unsuccessful_dribbles: unsuccessfulDribbles,
+      possession_lost: possessionLost,
+      offsides,
+      fouls,
+      yellow_cards: yellowCards,
+      red_cards: redCards,
+      created_at: new Date().toISOString()
+    };
+  }).filter(Boolean) as any[];
+
+  if (sanitizedRows.length === 0) {
+    throw new Error("No valid player stat rows found in file.");
+  }
+
+  // Primary target: public.player_stats
+  const { error: statsErr } = await (supabase.from('player_stats') as any)
+    .upsert(sanitizedRows, { onConflict: 'id' });
+
+  if (statsErr) {
+    console.warn("Supabase player_stats upsert warning (falling back to match_logs):", statsErr.message);
+    const { error: logsErr } = await (supabase.from('match_logs') as any)
+      .upsert(sanitizedRows, { onConflict: 'id' });
+
+    if (logsErr) {
+      console.warn("Supabase match_logs upsert warning:", logsErr.message);
+    }
+  }
+
+  // Mirror to DataService
+  await DataService.savePlayerMatchRecords(sanitizedRows.map(r => ({
+    id: r.id,
+    matchId: r.match_id,
+    playerId: r.player_id,
+    playerName: r.player_name,
+    username: r.username,
+    goals: r.goals,
+    shots: r.shots,
+    shotsOnTarget: r.shots_on_target,
+    totalPasses: r.passes,
+    completedPasses: r.successful_passes,
+    tackles: r.tackles,
+    tacklesWon: r.tackles_won,
+    interceptions: r.interceptions,
+    ...r
+  })));
+
+  return { count: sanitizedRows.length, data: sanitizedRows };
+};
+
 export const handlePlayerExcelUpload = async (file: File) => {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array' });
@@ -668,12 +1059,12 @@ export class ExcelUtils {
       const sheet = workbook.Sheets[name];
       if (!sheet || !sheet['!ref']) continue;
       try {
-        const XLSX = (window as any).XLSX || require("xlsx");
-        const range = XLSX.utils.decode_range(sheet['!ref']);
+        const XLSXLib = (window as any).XLSX || XLSX;
+        const range = XLSXLib.utils.decode_range(sheet['!ref']);
         const scanRows = Math.min(range.s.r + 10, range.e.r);
         for (let row = range.s.r; row <= scanRows; row++) {
           for (let col = range.s.c; col <= range.e.c; col++) {
-            const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+            const cellAddress = XLSXLib.utils.encode_cell({ r: row, c: col });
             const cell = sheet[cellAddress];
             if (cell && cell.v !== undefined && cell.v !== null) {
               const val = String(cell.v).trim().toLowerCase();
@@ -694,8 +1085,8 @@ export class ExcelUtils {
   static findHeaderRowIndex(sheet: any, headerKey: string, useMatchAliases: boolean = false): number {
     if (!sheet || !sheet['!ref']) return 0;
     try {
-      const XLSX = (window as any).XLSX || require("xlsx");
-      const range = XLSX.utils.decode_range(sheet['!ref']);
+      const XLSXLib = (window as any).XLSX || XLSX;
+      const range = XLSXLib.utils.decode_range(sheet['!ref']);
       const aliases = useMatchAliases 
         ? (MATCH_IDENTIFIER_ALIASES[headerKey] || [headerKey])
         : (HEADER_ALIASES[headerKey] || [headerKey]);
