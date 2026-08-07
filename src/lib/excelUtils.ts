@@ -285,146 +285,86 @@ export const parseMatchFixturesExcel = async (file: File): Promise<{ count: numb
     return Number(((num / den) * 100).toFixed(1));
   };
 
-  const sanitizedMatches = rawRows.map(row => {
+  const cleanMatchPayloads = rawRows.map(row => {
     const matchId = extractString(row, ['match_id', 'Match ID', 'Game ID', 'ID']) || `M-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
     const date = extractString(row, ['date', 'Date', 'Match Date']) || new Date().toISOString().split('T')[0];
     const opponent = extractString(row, ['opponent', 'Opponent', 'Opponent Team', 'VS']) || 'Opponent Team';
     const homeAway = extractString(row, ['home_away', 'Home/Away', 'Venue', 'homeAway']) || 'Home';
-    const ourScore = extractInt(row, ['our_score', 'Our Score', 'Goals For', 'goals', 'ourScore']);
-    const oppScore = extractInt(row, ['opponent_score', 'Opponent Score', 'Goals Against', 'oppScore']);
-    const matchStatus = extractString(row, ['status', 'Status']) || 'Finished';
-
-    const goals = extractInt(row, ['goals', 'Goals'], ourScore);
-    const shots = extractInt(row, ['shots', 'Shots', 'total_shots']);
-    const shotsOnTarget = extractInt(row, ['shots_on_target', 'Shots On Target', 'sot']);
-
-    const passes = extractInt(row, ['passes', 'Passes', 'total_passes']);
-    const successfulPasses = extractInt(row, ['successful_passes', 'Successful Passes', 'completed_passes']);
-    const backwardsPasses = extractInt(row, ['backwards_passes', 'Backwards Passes', 'backward_passes']);
-    const forwardsPasses = extractInt(row, ['forwards_passes', 'Forwards Passes', 'forward_passes']);
-    const longPasses = extractInt(row, ['long_passes', 'Long Passes']);
-    const successfulLongPasses = extractInt(row, ['successful_long_passes', 'Successful Long Passes']);
-    const keyPasses = extractInt(row, ['key_passes', 'Key Passes']);
-    const successfulKeyPasses = extractInt(row, ['successful_key_passes', 'Successful Key Passes']);
-    const throughBalls = extractInt(row, ['through_balls', 'Through Balls']);
-    const successfulThroughBalls = extractInt(row, ['successful_through_balls', 'Successful Through Balls']);
-    const crosses = extractInt(row, ['crosses', 'Crosses']);
-    const successfulCrosses = extractInt(row, ['successful_crosses', 'Successful Crosses']);
-
-    const dribbles = extractInt(row, ['dribbles', 'Dribbles']);
-    const successfulDribbles = extractInt(row, ['successful_dribbles', 'Successful Dribbles']);
-    const duels = extractInt(row, ['duels', 'Duels']);
-    const duelsWon = extractInt(row, ['duels_won', 'Duels Won']);
-    const aerialDuels = extractInt(row, ['aerial_duels', 'Aerial Duels']);
-    const aerialDuelsWon = extractInt(row, ['aerial_duels_won', 'Aerial Duels Won']);
-    const groundDuels = extractInt(row, ['ground_duels', 'Ground Duels']);
-    const groundDuelsWon = extractInt(row, ['ground_duels_won', 'Ground Duels Won']);
-
-    const ballRecoveries = extractInt(row, ['ball_recoveries', 'Ball Recoveries', 'recoveries']);
-    const tackles = extractInt(row, ['tackles', 'Tackles']);
-    const tacklesWon = extractInt(row, ['tackles_won', 'Tackles Won']);
-    const interceptions = extractInt(row, ['interceptions', 'Interceptions']);
-    const clearances = extractInt(row, ['clearances', 'Clearances']);
-    const blocks = extractInt(row, ['blocks', 'Blocks']);
-
-    const ownGoals = extractInt(row, ['own_goals', 'Own Goals']);
-    const turnovers = extractInt(row, ['turnovers', 'Turnovers']);
-    const miscontrols = extractInt(row, ['miscontrols', 'Miscontrols']);
-    const unsuccessfulDribbles = extractInt(row, ['unsuccessful_dribbles', 'Unsuccessful Dribbles']);
-    const possessionLost = extractInt(row, ['possession_lost', 'Possession Lost']);
-    const offsides = extractInt(row, ['offsides', 'Offsides']);
-    const fouls = extractInt(row, ['fouls', 'Fouls']);
-    const yellowCards = extractInt(row, ['yellow_cards', 'Yellow Cards']);
-    const redCards = extractInt(row, ['red_cards', 'Red Cards']);
-
-    const shotAccuracy = safeDivPct(shotsOnTarget, shots);
-    const passAccuracy = safeDivPct(successfulPasses, passes);
-    const duelWonPct = safeDivPct(duelsWon, duels);
-    const tackleWonPct = safeDivPct(tacklesWon, tackles);
+    const ourScore = extractInt(row, ['our_score', 'ourScore', 'Our Score', 'Goals For', 'goals']);
+    const oppScore = extractInt(row, ['opponent_score', 'opponentScore', 'Opponent Score', 'Goals Against']);
+    const status = extractString(row, ['status', 'Status']) || 'completed';
 
     return {
       id: matchId,
-      match_id: matchId,
-      date,
-      opponent,
-      venue: homeAway,
+      date: date,
+      opponent: opponent,
+      home_away: homeAway,
       our_score: ourScore,
-      opp_score: oppScore,
-      result: `${ourScore > oppScore ? 'W' : ourScore < oppScore ? 'L' : 'D'} (${ourScore}-${oppScore})`,
-      status: matchStatus,
-      goals,
-      shots,
-      shots_on_target: shotsOnTarget,
-      passes,
-      successful_passes: successfulPasses,
-      backwards_passes: backwardsPasses,
-      forwards_passes: forwardsPasses,
-      long_passes: longPasses,
-      successful_long_passes: successfulLongPasses,
-      key_passes: keyPasses,
-      successful_key_passes: successfulKeyPasses,
-      through_balls: throughBalls,
-      successful_through_balls: successfulThroughBalls,
-      crosses,
-      successful_crosses: successfulCrosses,
-      dribbles,
-      successful_dribbles: successfulDribbles,
-      duels,
-      duels_won: duelsWon,
-      aerial_duels: aerialDuels,
-      aerial_duels_won: aerialDuelsWon,
-      ground_duels: groundDuels,
-      ground_duels_won: groundDuelsWon,
-      ball_recoveries: ballRecoveries,
-      tackles,
-      tackles_won: tacklesWon,
-      interceptions,
-      clearances,
-      blocks,
-      own_goals: ownGoals,
-      turnovers,
-      miscontrols,
-      unsuccessful_dribbles: unsuccessfulDribbles,
-      possession_lost: possessionLost,
-      offsides,
-      fouls,
-      yellow_cards: yellowCards,
-      red_cards: redCards,
-      shot_accuracy: shotAccuracy,
-      pass_accuracy: passAccuracy,
-      duel_won_pct: duelWonPct,
-      tackle_won_pct: tackleWonPct,
-      created_at: new Date().toISOString()
-    };
-  }).filter(r => r.match_id !== '' || r.opponent !== '');
+      opponent_score: oppScore,
+      status: status,
 
-  if (sanitizedMatches.length === 0) {
+      goals: extractInt(row, ['goals', 'Goals'], ourScore),
+      shots: extractInt(row, ['shots', 'total_shots', 'totalShots', 'Shots']),
+      shots_on_target: extractInt(row, ['shots_on_target', 'shotsOnTarget', 'Shots On Target', 'sot']),
+      passes: extractInt(row, ['passes', 'total_passes', 'totalPasses', 'Passes']),
+      successful_passes: extractInt(row, ['successful_passes', 'successfulPasses', 'completed_passes', 'completedPasses']),
+      backwards_passes: extractInt(row, ['backwards_passes', 'backwardsPasses', 'backward_passes']),
+      forwards_passes: extractInt(row, ['forwards_passes', 'forwardsPasses', 'forward_passes']),
+      long_passes: extractInt(row, ['long_passes', 'longPasses']),
+      successful_long_passes: extractInt(row, ['successful_long_passes', 'successfulLongPasses']),
+      key_passes: extractInt(row, ['key_passes', 'keyPasses']),
+      successful_key_passes: extractInt(row, ['successful_key_passes', 'successfulKeyPasses']),
+      through_balls: extractInt(row, ['through_balls', 'throughBalls']),
+      successful_through_balls: extractInt(row, ['successful_through_balls', 'successfulThroughBalls']),
+      crosses: extractInt(row, ['crosses', 'Crosses']),
+      successful_crosses: extractInt(row, ['successful_crosses', 'successfulCrosses']),
+      dribbles: extractInt(row, ['dribbles', 'Dribbles']),
+      successful_dribbles: extractInt(row, ['successful_dribbles', 'successfulDribbles']),
+      duels: extractInt(row, ['duels', 'Duels']),
+      duels_won: extractInt(row, ['duels_won', 'duelsWon', 'Duels Won']),
+      aerial_duels: extractInt(row, ['aerial_duels', 'aerialDuels']),
+      aerial_duels_won: extractInt(row, ['aerial_duels_won', 'aerialDuelsWon']),
+      ground_duels: extractInt(row, ['ground_duels', 'groundDuels']),
+      ground_duels_won: extractInt(row, ['ground_duels_won', 'groundDuelsWon']),
+      ball_recoveries: extractInt(row, ['ball_recoveries', 'ballRecoveries', 'recoveries']),
+      tackles: extractInt(row, ['tackles', 'Tackles']),
+      tackles_won: extractInt(row, ['tackles_won', 'tacklesWon']),
+      interceptions: extractInt(row, ['interceptions', 'Interceptions']),
+      clearances: extractInt(row, ['clearances', 'Clearances']),
+      blocks: extractInt(row, ['blocks', 'Blocks']),
+      own_goals: extractInt(row, ['own_goals', 'ownGoals']),
+      turnovers: extractInt(row, ['turnovers', 'Turnovers']),
+      miscontrols: extractInt(row, ['miscontrols', 'Miscontrols']),
+      unsuccessful_dribbles: extractInt(row, ['unsuccessful_dribbles', 'unsuccessfulDribbles']),
+      possession_lost: extractInt(row, ['possession_lost', 'possessionLost']),
+      offsides: extractInt(row, ['offsides', 'Offsides']),
+      fouls: extractInt(row, ['fouls', 'Fouls']),
+      yellow_cards: extractInt(row, ['yellow_cards', 'yellowCards']),
+      red_cards: extractInt(row, ['red_cards', 'redCards'])
+    };
+  }).filter(r => r.id !== '' || r.opponent !== '');
+
+  if (cleanMatchPayloads.length === 0) {
     throw new Error("No valid match fixture entries found in file.");
   }
 
-  // Primary target: public.matches
+  // Target public.matches strictly WITHOUT fallback to match_fixtures
   const { error: matchesErr } = await (supabase.from('matches') as any)
-    .upsert(sanitizedMatches, { onConflict: 'id' });
+    .upsert(cleanMatchPayloads, { onConflict: 'id' });
 
   if (matchesErr) {
-    console.warn("Supabase matches upsert warning (falling back to match_fixtures):", matchesErr.message);
-    const { error: fallbackErr } = await (supabase.from('match_fixtures') as any)
-      .upsert(sanitizedMatches, { onConflict: 'id' });
-
-    if (fallbackErr) {
-      console.warn("Supabase match_fixtures upsert warning:", fallbackErr.message);
-    }
+    console.warn("Supabase public.matches upsert error:", matchesErr.message);
   }
 
-  // Mirror to DataService
-  await DataService.saveMatches(sanitizedMatches.map(m => DataService.migrateMatch({
+  // Mirror to DataService local cache
+  await DataService.saveMatches(cleanMatchPayloads.map(m => DataService.migrateMatch({
     id: m.id,
     date: m.date,
     opponent: m.opponent,
-    venue: m.venue as any,
+    venue: m.home_away as any,
     ourScore: m.our_score,
-    oppScore: m.opp_score,
-    result: m.result,
+    oppScore: m.opponent_score,
+    result: `${m.our_score > m.opponent_score ? 'W' : m.our_score < m.opponent_score ? 'L' : 'D'} (${m.our_score}-${m.opponent_score})`,
     status: m.status as any,
     totalShots: m.shots,
     shotsOnTarget: m.shots_on_target,
@@ -433,7 +373,7 @@ export const parseMatchFixturesExcel = async (file: File): Promise<{ count: numb
     ...m
   })));
 
-  return { count: sanitizedMatches.length, data: sanitizedMatches };
+  return { count: cleanMatchPayloads.length, data: cleanMatchPayloads };
 };
 
 // Explicit standalone parser for Individual Player Stats (player_stats table)

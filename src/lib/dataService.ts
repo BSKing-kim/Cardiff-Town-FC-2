@@ -444,10 +444,59 @@ export class DataService {
 
     try {
       if (reassigned.length > 0) {
-        const { error: matchesErr } = await (supabase.from("matches") as any).upsert(this.sanitizeForSupabase(reassigned));
+        const cleanMatchesPayload = reassigned.map((row: any) => ({
+          id: row.id || row.match_id,
+          date: row.date,
+          opponent: row.opponent,
+          home_away: row.home_away || row.venue || row.homeAway || 'Home',
+          our_score: row.our_score ?? row.ourScore ?? 0,
+          opponent_score: row.opponent_score ?? row.oppScore ?? row.opponentScore ?? 0,
+          status: row.status || 'completed',
+
+          goals: row.goals ?? row.ourScore ?? 0,
+          shots: row.shots ?? row.totalShots ?? 0,
+          shots_on_target: row.shots_on_target ?? row.shotsOnTarget ?? 0,
+          passes: row.passes ?? row.totalPasses ?? 0,
+          successful_passes: row.successful_passes ?? row.successfulPasses ?? row.completedPasses ?? 0,
+          backwards_passes: row.backwards_passes ?? row.backwardsPasses ?? 0,
+          forwards_passes: row.forwards_passes ?? row.forwardsPasses ?? 0,
+          long_passes: row.long_passes ?? row.longPasses ?? 0,
+          successful_long_passes: row.successful_long_passes ?? row.successfulLongPasses ?? 0,
+          key_passes: row.key_passes ?? row.keyPasses ?? 0,
+          successful_key_passes: row.successful_key_passes ?? row.successfulKeyPasses ?? 0,
+          through_balls: row.through_balls ?? row.throughBalls ?? 0,
+          successful_through_balls: row.successful_through_balls ?? row.successfulThroughBalls ?? 0,
+          crosses: row.crosses ?? 0,
+          successful_crosses: row.successful_crosses ?? row.successfulCrosses ?? 0,
+          dribbles: row.dribbles ?? 0,
+          successful_dribbles: row.successful_dribbles ?? row.successfulDribbles ?? 0,
+          duels: row.duels ?? 0,
+          duels_won: row.duels_won ?? row.duelsWon ?? 0,
+          aerial_duels: row.aerial_duels ?? row.aerialDuels ?? 0,
+          aerial_duels_won: row.aerial_duels_won ?? row.aerialDuelsWon ?? 0,
+          ground_duels: row.ground_duels ?? row.groundDuels ?? 0,
+          ground_duels_won: row.ground_duels_won ?? row.groundDuelsWon ?? 0,
+          ball_recoveries: row.ball_recoveries ?? row.ballRecoveries ?? 0,
+          tackles: row.tackles ?? 0,
+          tackles_won: row.tackles_won ?? row.tacklesWon ?? 0,
+          interceptions: row.interceptions ?? 0,
+          clearances: row.clearances ?? 0,
+          blocks: row.blocks ?? 0,
+          own_goals: row.own_goals ?? row.ownGoals ?? 0,
+          turnovers: row.turnovers ?? 0,
+          miscontrols: row.miscontrols ?? 0,
+          unsuccessful_dribbles: row.unsuccessful_dribbles ?? row.unsuccessfulDribbles ?? 0,
+          possession_lost: row.possession_lost ?? row.possessionLost ?? 0,
+          offsides: row.offsides ?? 0,
+          fouls: row.fouls ?? 0,
+          yellow_cards: row.yellow_cards ?? row.yellowCards ?? 0,
+          red_cards: row.red_cards ?? row.redCards ?? 0
+        }));
+
+        const { error: matchesErr } = await (supabase.from("matches") as any)
+          .upsert(cleanMatchesPayload, { onConflict: 'id' });
         if (matchesErr) {
-          console.warn("Supabase matches upsert warning (falling back to match_fixtures):", matchesErr.message);
-          await (supabase.from("match_fixtures") as any).upsert(this.sanitizeForSupabase(reassigned));
+          console.warn("Supabase public.matches upsert error:", matchesErr.message);
         }
       }
     } catch (e) {
