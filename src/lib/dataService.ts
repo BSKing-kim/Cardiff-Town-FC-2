@@ -1662,9 +1662,42 @@ export class DataService {
     localStorage.removeItem(CURRENT_USER_LS_KEY);
   }
 
+  static async findUsernameByFullName(firstName: string, lastName: string): Promise<string | null> {
+    const fName = (firstName || "").trim();
+    const lName = (lastName || "").trim();
+    if (!fName || !lName) return null;
+
+    const targetFullName = `${fName} ${lName}`.trim();
+
+    try {
+      // 1. Case-insensitive query on full_name in Supabase profiles
+      const { data, error } = await (supabase.from("profiles") as any)
+        .select("username, full_name")
+        .ilike("full_name", targetFullName);
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        const found = data.find(p => p.username);
+        if (found?.username) return found.username;
+      }
+    } catch (e) {
+      console.warn("Supabase lookup for username failed:", e);
+    }
+
+    // 2. Fallback to local users list
+    const users = await this.getUsers();
+    const foundUser = users.find(
+      u =>
+        u.firstName?.trim().toLowerCase() === fName.toLowerCase() &&
+        u.lastName?.trim().toLowerCase() === lName.toLowerCase()
+    );
+
+    return foundUser?.username || null;
+  }
+
   static async login(username: string, passwordPlain: string): Promise<UserProfile> {
-    const cleanUsername = (username || "").trim().toLowerCase();
-    if (!cleanUsername) {
+    const inputUsername = (username || "").trim();
+    const cleanUsername = inputUsername.toLowerCase();
+    if (!inputUsername) {
       throw new Error("Please enter a username.");
     }
 
@@ -1674,61 +1707,81 @@ export class DataService {
       return DEFAULT_ADMIN;
     }
 
-    // 2. Verify credentials with Supabase Auth
-    const userEmail = cleanUsername.includes('@') ? cleanUsername : `${cleanUsername}@ctfc.club`;
+    // 2. Case-insensitive lookup in Supabase profiles by username first (.ilike('username', inputUsername))
+    let profileData: any = null;
+    try {
+      const { data: pData } = await (supabase.from('profiles') as any)
+        .select('*')
+        .ilike('username', inputUsername)
+        .maybeSingle();
+
+      if (pData) {
+        profileData = pData;
+      } else {
+        const { data: pIdData } = await (supabase.from('profiles') as any)
+          .select('*')
+          .or(`id.eq.${inputUsername},user_id.eq.${inputUsername}`)
+          .maybeSingle();
+
+        if (pIdData) profileData = pIdData;
+      }
+    } catch (err) {
+      console.warn("Supabase profile lookup warning:", err);
+    }
+
+    // 3. Fallback to local user
+    const users = await this.getUsers();
+    const localUser = users.find(u => u.username.toLowerCase() === cleanUsername);
+
+    // 4. Determine target email for Auth login
+    const targetUsername = profileData?.username || localUser?.username || cleanUsername;
+    const targetEmail = (profileData?.email || localUser?.email || (inputUsername.includes('@') ? inputUsername : `${targetUsername.toLowerCase()}@ctfc.club`)).trim();
+
+    // 5. Authenticate with Supabase Auth using targetEmail
     let authUser: any = null;
+    let authErr: any = null;
 
     try {
-      const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
-        email: userEmail,
+      const { data: authData, error: err } = await supabase.auth.signInWithPassword({
+        email: targetEmail,
         password: passwordPlain
       });
 
-      if (!authErr && authData?.user) {
+      if (!err && authData?.user) {
         authUser = authData.user;
+      } else {
+        authErr = err;
       }
     } catch (e) {
+      authErr = e;
       console.warn("Supabase Auth signInWithPassword exception:", e);
     }
 
-    // 3. Query profiles table from Supabase for approval status and role
-    let profileData: any = null;
-    const authId = authUser?.id;
-
-    try {
-      if (authId) {
-        const { data: pData } = await (supabase.from('profiles') as any)
-          .select('id, user_id, player_id, full_name, username, role, status, position, preferred_foot, nationality, squad_number, is_onboarded, onboarding_completed')
-          .eq('id', authId)
-          .maybeSingle();
-
-        if (pData) {
-          profileData = pData;
-        } else {
-          const { data: pUserData } = await (supabase.from('profiles') as any)
-            .select('id, user_id, player_id, full_name, username, role, status, position, preferred_foot, nationality, squad_number, is_onboarded, onboarding_completed')
-            .eq('user_id', authId)
-            .maybeSingle();
-
-          if (pUserData) profileData = pUserData;
+    // If Auth failed and input contains '@', try direct email login if different from targetEmail
+    if (!authUser && inputUsername.includes('@') && targetEmail !== inputUsername) {
+      try {
+        const { data: altAuthData, error: altAuthErr } = await supabase.auth.signInWithPassword({
+          email: inputUsername,
+          password: passwordPlain
+        });
+        if (!altAuthErr && altAuthData?.user) {
+          authUser = altAuthData.user;
+          authErr = null;
         }
-      }
-
-      if (!profileData) {
-        const { data: pUnameData } = await (supabase.from('profiles') as any)
-          .select('id, user_id, player_id, full_name, username, role, status, position, preferred_foot, nationality, squad_number, is_onboarded, onboarding_completed')
-          .ilike('username', cleanUsername)
-          .maybeSingle();
-
-        if (pUnameData) profileData = pUnameData;
-      }
-    } catch (err) {
-      console.warn("Supabase profile status query warning:", err);
+      } catch {}
     }
 
-    // 4. Local User Fallback
-    const users = await this.getUsers();
-    const localUser = users.find(u => u.username.toLowerCase() === cleanUsername);
+    // 6. If profile was not found by username but authUser exists, fetch profile by authUser.id
+    if (!profileData && authUser?.id) {
+      try {
+        const { data: pAuthData } = await (supabase.from('profiles') as any)
+          .select('*')
+          .or(`id.eq.${authUser.id},user_id.eq.${authUser.id}`)
+          .maybeSingle();
+
+        if (pAuthData) profileData = pAuthData;
+      } catch {}
+    }
 
     if (!authUser && !localUser && !profileData) {
       throw new Error("This username does not exist.");
@@ -1738,7 +1791,11 @@ export class DataService {
       throw new Error("Incorrect password.");
     }
 
-    // 5. Check Approval Status: If profile.status !== 'approved', block login and sign out immediately
+    if (authErr && !localUser && authErr.message?.toLowerCase().includes("invalid login credentials")) {
+      throw new Error("Incorrect password.");
+    }
+
+    // 7. Check Approval Status: If profile.status !== 'approved', block login and sign out immediately
     const statusVal = profileData?.status || localUser?.status || (localUser?.approved === false ? "pending" : "approved");
     const statusStr = String(statusVal).trim().toLowerCase();
 
@@ -1759,19 +1816,19 @@ export class DataService {
       throw new Error("Your account registration is currently pending Admin approval. Please try again later once an Admin has approved your account.");
     }
 
-    // 6. User is approved -> construct profile object & complete login
-    const resolvedUsername = profileData?.username || localUser?.username || cleanUsername;
+    // 8. User is approved -> construct profile object & complete login
+    const resolvedUsername = profileData?.username || localUser?.username || inputUsername;
     const nameParts = (profileData?.full_name || (localUser?.firstName ? `${localUser.firstName} ${localUser.lastName}` : resolvedUsername)).split(" ");
     const userRole = (profileData?.role || localUser?.role || UserRole.Player) as UserRole;
 
     const loggedInProfile: UserProfile = {
-      id: authId || localUser?.id || profileData?.id || profileData?.user_id || `usr_${resolvedUsername}`,
-      user_id: authId || localUser?.user_id || profileData?.user_id,
+      id: authUser?.id || profileData?.id || profileData?.user_id || localUser?.id || `usr_${resolvedUsername}`,
+      user_id: authUser?.id || profileData?.user_id || localUser?.user_id,
       player_id: profileData?.player_id || localUser?.player_id,
       username: resolvedUsername,
       role: userRole,
       isAdmin: userRole === UserRole.HeadCoach || userRole === UserRole.Manager || (localUser ? localUser.isAdmin : false) || resolvedUsername.toLowerCase() === DEFAULT_ADMIN.username.toLowerCase(),
-      createdAt: localUser?.createdAt || new Date().toISOString(),
+      createdAt: localUser?.createdAt || profileData?.created_at || new Date().toISOString(),
       firstName: localUser?.firstName || nameParts[0] || "",
       lastName: localUser?.lastName || nameParts.slice(1).join(" ") || "",
       position: profileData?.position || localUser?.position || "CM",

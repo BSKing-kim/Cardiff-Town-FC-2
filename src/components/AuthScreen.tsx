@@ -77,15 +77,10 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
     }
 
     try {
-      const users = await DataService.getUsers();
-      const found = users.find(
-        (u) =>
-          u.firstName?.trim().toLowerCase() === searchFirstName.trim().toLowerCase() &&
-          u.lastName?.trim().toLowerCase() === searchLastName.trim().toLowerCase()
-      );
+      const foundUsername = await DataService.findUsernameByFullName(searchFirstName, searchLastName);
 
-      if (found) {
-        setSearchResult(found.username);
+      if (foundUsername) {
+        setSearchResult(foundUsername);
       } else {
         setSearchError("No username was found matching that First Name and Last Name. Please verify the spelling or check with an administrator.");
       }
