@@ -235,7 +235,12 @@ export default function App() {
                 className="flex items-center gap-2.5 cursor-pointer hover:opacity-90 select-none transition-all"
                 title="Cardiff Town FC Performance Hub"
               >
-                <TeamLogo teamName="Cardiff Town FC" size={34} className="border border-[#eab308]/50 rounded-xl bg-[#0b0f19] p-0.5 shadow-md shrink-0" />
+                <img
+                  src="/Cardiff-town-logo.jpg"
+                  onError={(e) => { (e.target as HTMLImageElement).src = "/logo.png"; }}
+                  alt="Cardiff Town FC Crest Logo"
+                  className="h-9 w-9 object-contain rounded-xl border border-[#eab308]/60 bg-[#0b0f19] p-0.5 shadow-md shrink-0"
+                />
                 <div>
                   <h1 className="font-display font-black text-sm sm:text-base tracking-wider leading-none text-white flex items-center gap-2">
                     CARDIFF TOWN FC

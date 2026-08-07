@@ -165,17 +165,24 @@ export default function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
     <div className="flex min-h-screen items-center justify-center bg-[#0b0f19] px-4 py-8" id="auth-screen-container">
       <div className="w-full max-w-sm space-y-5 rounded-2xl border border-[#334155] bg-[#1e293b] p-6 shadow-2xl animate-fadeIn text-white">
         
-        {/* Header section with brand */}
-        <div className="text-center" id="auth-header">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-[#0b0f19] text-[#eab308] border border-[#334155] shadow-md">
-            <HardDrive className="h-6 w-6 text-[#eab308]" />
+        {/* Header section with brand logo hero */}
+        <div className="text-center space-y-3" id="auth-header">
+          <div className="relative mx-auto flex h-28 w-28 items-center justify-center rounded-2xl bg-[#0b0f19] border-2 border-[#eab308]/70 shadow-[0_0_25px_rgba(234,179,8,0.25)] p-2 transition-transform hover:scale-105">
+            <img
+              src="/Cardiff-town-logo.jpg"
+              onError={(e) => { (e.target as HTMLImageElement).src = "/logo.png"; }}
+              alt="Cardiff Town FC Crest Logo"
+              className="h-full w-full object-contain rounded-xl"
+            />
           </div>
-          <h2 className="mt-3 font-display text-lg font-black tracking-wider text-white uppercase">
-            Performance Analyzer Portal
-          </h2>
-          <p className="text-[10px] text-[#eab308] font-mono font-bold uppercase tracking-widest mt-1">
-            Cardiff Town FC • Official Team Portal
-          </p>
+          <div className="space-y-1">
+            <h2 className="font-display text-base sm:text-lg font-black tracking-wider text-white uppercase leading-snug">
+              CARDIFF TOWN FC PERFORMANCE ANALYZER
+            </h2>
+            <p className="text-[10px] text-[#eab308] font-mono font-bold uppercase tracking-widest">
+              Official Team Tactical Portal
+            </p>
+          </div>
         </div>
 
         {isSubmitted ? (

@@ -75,16 +75,16 @@ export default function TeamLogo({ teamName, size = 24, className = "" }: TeamLo
   let config: CrestConfig;
 
   if (normName.includes("cardiff town")) {
-    // Cardiff Town FC - Blue, White, Gold (US)
-    config = {
-      primaryColor: "#0A2342", // Deep Royal Navy Blue
-      secondaryColor: "#FFFFFF", // Crisp White
-      borderColor: "#D4AF37", // Elegant Gold
-      textColor: "#D4AF37",
-      shape: "shield",
-      initials: "CT",
-      symbol: "dragon"
-    };
+    return (
+      <img
+        src="/Cardiff-town-logo.jpg"
+        onError={(e) => { (e.target as HTMLImageElement).src = "/logo.png"; }}
+        alt={teamName}
+        width={size}
+        height={size}
+        className={`object-contain shrink-0 select-none rounded-xl ${className}`}
+      />
+    );
   } else if (normName.includes("tiger bay")) {
     config = {
       primaryColor: "#111827",
