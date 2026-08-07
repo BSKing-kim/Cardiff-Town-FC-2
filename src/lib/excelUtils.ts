@@ -344,22 +344,115 @@ export const parseMatchFixturesExcel = async (file: File): Promise<{ count: numb
     };
   }).filter(r => r.id !== '' || r.opponent !== '');
 
-  // Map to merge/deduplicate rows sharing the same match_id
-  const matchMap = new Map<string, any>();
+  // Group rows by match_id and merge Our Team / Opponent Team data
+  const groupedByMatch: { [matchId: string]: any[] } = {};
 
   cleanMatchPayloads.forEach(row => {
     const matchId = String(row.id || (row as any).match_id).trim();
     if (!matchId) return;
-
-    if (matchMap.has(matchId)) {
-      const existing = matchMap.get(matchId);
-      matchMap.set(matchId, { ...existing, ...row, id: matchId });
-    } else {
-      matchMap.set(matchId, { ...row, id: matchId });
-    }
+    if (!groupedByMatch[matchId]) groupedByMatch[matchId] = [];
+    groupedByMatch[matchId].push(row);
   });
 
-  const uniqueMatches = Array.from(matchMap.values());
+  const uniqueMatches = Object.keys(groupedByMatch).map(matchId => {
+    const matchRows = groupedByMatch[matchId];
+    
+    // Row where Opponent is NOT Cardiff Town FC = OUR TEAM STATS
+    const ourRow = matchRows.find(r => String(r.opponent || "").trim().toLowerCase() !== 'cardiff town fc') || matchRows[0];
+    
+    // Row where Opponent IS Cardiff Town FC = OPPONENT STATS
+    const oppRow = matchRows.find(r => String(r.opponent || "").trim().toLowerCase() === 'cardiff town fc') || matchRows[1] || {};
+
+    return {
+      id: matchId,
+      date: ourRow.date,
+      opponent: ourRow.opponent, // Enemy team name
+      home_away: ourRow.home_away || 'Home',
+      our_score: Number(ourRow.goals || 0),
+      opponent_score: Number(oppRow.goals || 0),
+      status: 'completed',
+
+      // OUR TEAM STATS
+      goals: Number(ourRow.goals || 0),
+      shots: Number(ourRow.shots || 0),
+      shots_on_target: Number(ourRow.shots_on_target || 0),
+      passes: Number(ourRow.passes || 0),
+      successful_passes: Number(ourRow.successful_passes || 0),
+      backwards_passes: Number(ourRow.backwards_passes || 0),
+      forwards_passes: Number(ourRow.forwards_passes || 0),
+      long_passes: Number(ourRow.long_passes || 0),
+      successful_long_passes: Number(ourRow.successful_long_passes || 0),
+      key_passes: Number(ourRow.key_passes || 0),
+      successful_key_passes: Number(ourRow.successful_key_passes || 0),
+      through_balls: Number(ourRow.through_balls || 0),
+      successful_through_balls: Number(ourRow.successful_through_balls || 0),
+      crosses: Number(ourRow.crosses || 0),
+      successful_crosses: Number(ourRow.successful_crosses || 0),
+      dribbles: Number(ourRow.dribbles || 0),
+      successful_dribbles: Number(ourRow.successful_dribbles || 0),
+      duels: Number(ourRow.duels || 0),
+      duels_won: Number(ourRow.duels_won || 0),
+      aerial_duels: Number(ourRow.aerial_duels || 0),
+      aerial_duels_won: Number(ourRow.aerial_duels_won || 0),
+      ground_duels: Number(ourRow.ground_duels || 0),
+      ground_duels_won: Number(ourRow.ground_duels_won || 0),
+      ball_recoveries: Number(ourRow.ball_recoveries || 0),
+      tackles: Number(ourRow.tackles || 0),
+      tackles_won: Number(ourRow.tackles_won || 0),
+      interceptions: Number(ourRow.interceptions || 0),
+      clearances: Number(ourRow.clearances || 0),
+      blocks: Number(ourRow.blocks || 0),
+      own_goals: Number(ourRow.own_goals || 0),
+      turnovers: Number(ourRow.turnovers || 0),
+      miscontrols: Number(ourRow.miscontrols || 0),
+      unsuccessful_dribbles: Number(ourRow.unsuccessful_dribbles || 0),
+      possession_lost: Number(ourRow.possession_lost || 0),
+      offsides: Number(ourRow.offsides || 0),
+      fouls: Number(ourRow.fouls || 0),
+      yellow_cards: Number(ourRow.yellow_cards || 0),
+      red_cards: Number(ourRow.red_cards || 0),
+
+      // OPPONENT TEAM STATS (opp_ prefix)
+      opp_goals: Number(oppRow.goals || 0),
+      opp_shots: Number(oppRow.shots || 0),
+      opp_shots_on_target: Number(oppRow.shots_on_target || 0),
+      opp_passes: Number(oppRow.passes || 0),
+      opp_successful_passes: Number(oppRow.successful_passes || 0),
+      opp_backwards_passes: Number(oppRow.backwards_passes || 0),
+      opp_forwards_passes: Number(oppRow.forwards_passes || 0),
+      opp_long_passes: Number(oppRow.long_passes || 0),
+      opp_successful_long_passes: Number(oppRow.successful_long_passes || 0),
+      opp_key_passes: Number(oppRow.key_passes || 0),
+      opp_successful_key_passes: Number(oppRow.successful_key_passes || 0),
+      opp_through_balls: Number(oppRow.through_balls || 0),
+      opp_successful_through_balls: Number(oppRow.successful_through_balls || 0),
+      opp_crosses: Number(oppRow.crosses || 0),
+      opp_successful_crosses: Number(oppRow.successful_crosses || 0),
+      opp_dribbles: Number(oppRow.dribbles || 0),
+      opp_successful_dribbles: Number(oppRow.successful_dribbles || 0),
+      opp_duels: Number(oppRow.duels || 0),
+      opp_duels_won: Number(oppRow.duels_won || 0),
+      opp_aerial_duels: Number(oppRow.aerial_duels || 0),
+      opp_aerial_duels_won: Number(oppRow.aerial_duels_won || 0),
+      opp_ground_duels: Number(oppRow.ground_duels || 0),
+      opp_ground_duels_won: Number(oppRow.ground_duels_won || 0),
+      opp_ball_recoveries: Number(oppRow.ball_recoveries || 0),
+      opp_tackles: Number(oppRow.tackles || 0),
+      opp_tackles_won: Number(oppRow.tackles_won || 0),
+      opp_interceptions: Number(oppRow.interceptions || 0),
+      opp_clearances: Number(oppRow.clearances || 0),
+      opp_blocks: Number(oppRow.blocks || 0),
+      opp_own_goals: Number(oppRow.own_goals || 0),
+      opp_turnovers: Number(oppRow.turnovers || 0),
+      opp_miscontrols: Number(oppRow.miscontrols || 0),
+      opp_unsuccessful_dribbles: Number(oppRow.unsuccessful_dribbles || 0),
+      opp_possession_lost: Number(oppRow.possession_lost || 0),
+      opp_offsides: Number(oppRow.offsides || 0),
+      opp_fouls: Number(oppRow.fouls || 0),
+      opp_yellow_cards: Number(oppRow.yellow_cards || 0),
+      opp_red_cards: Number(oppRow.red_cards || 0)
+    };
+  });
 
   if (uniqueMatches.length === 0) {
     throw new Error("No valid match fixture entries found in file.");

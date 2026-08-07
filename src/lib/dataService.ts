@@ -382,8 +382,8 @@ export class DataService {
   }
 
   static reassignMatchIds(matches: MatchData[]): MatchData[] {
-    const sorted = [...matches].sort((a, b) => a.date.localeCompare(b.date));
-    return sorted.map((match, index) => {
+    return matches.map((match, index) => {
+      if (match.id) return match;
       const numStr = String(index + 1).padStart(2, "0");
       return {
         ...match,

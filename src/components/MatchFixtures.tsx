@@ -52,92 +52,38 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
     try {
       // 1. Parse Excel file using parseMatchFixturesExcel
       const parsed = await parseMatchFixturesExcel(file);
-
       const rawMatchList = parsed.data && parsed.data.length > 0 ? parsed.data : [{}];
-      const cleanMatchPayload = rawMatchList.map((m: any) => ({
+      
+      const mergedMatchesPayload = rawMatchList.map((m: any) => ({
+        ...m,
         id: targetMatchId,
         date: m.date || fixture.date,
         opponent: m.opponent || fixture.opponent,
         home_away: m.home_away || fixture.venue || 'Home',
-        our_score: m.our_score ?? m.ourScore ?? 0,
-        opponent_score: m.opponent_score ?? m.oppScore ?? 0,
-        status: 'completed',
-
-        goals: m.goals ?? m.our_score ?? 0,
-        shots: m.shots ?? m.total_shots ?? 0,
-        shots_on_target: m.shots_on_target ?? 0,
-        passes: m.passes ?? 0,
-        successful_passes: m.successful_passes ?? 0,
-        backwards_passes: m.backwards_passes ?? 0,
-        forwards_passes: m.forwards_passes ?? 0,
-        long_passes: m.long_passes ?? 0,
-        successful_long_passes: m.successful_long_passes ?? 0,
-        key_passes: m.key_passes ?? 0,
-        successful_key_passes: m.successful_key_passes ?? 0,
-        through_balls: m.through_balls ?? 0,
-        successful_through_balls: m.successful_through_balls ?? 0,
-        crosses: m.crosses ?? 0,
-        successful_crosses: m.successful_crosses ?? 0,
-        dribbles: m.dribbles ?? 0,
-        successful_dribbles: m.successful_dribbles ?? 0,
-        duels: m.duels ?? 0,
-        duels_won: m.duels_won ?? 0,
-        aerial_duels: m.aerial_duels ?? 0,
-        aerial_duels_won: m.aerial_duels_won ?? 0,
-        ground_duels: m.ground_duels ?? 0,
-        ground_duels_won: m.ground_duels_won ?? 0,
-        ball_recoveries: m.ball_recoveries ?? 0,
-        tackles: m.tackles ?? 0,
-        tackles_won: m.tackles_won ?? 0,
-        interceptions: m.interceptions ?? 0,
-        clearances: m.clearances ?? 0,
-        blocks: m.blocks ?? 0,
-        own_goals: m.own_goals ?? 0,
-        turnovers: m.turnovers ?? 0,
-        miscontrols: m.miscontrols ?? 0,
-        unsuccessful_dribbles: m.unsuccessful_dribbles ?? 0,
-        possession_lost: m.possession_lost ?? 0,
-        offsides: m.offsides ?? 0,
-        fouls: m.fouls ?? 0,
-        yellow_cards: m.yellow_cards ?? 0,
-        red_cards: m.red_cards ?? 0
+        our_score: m.our_score ?? m.goals ?? 0,
+        opponent_score: m.opponent_score ?? m.opp_goals ?? 0,
+        status: 'completed'
       }));
 
-      // Deduplicate by match_id
-      const matchMap = new Map<string, any>();
-      cleanMatchPayload.forEach(row => matchMap.set(String(row.id).trim(), row));
-      const uniqueMatches = Array.from(matchMap.values());
+      // Detailed console logging
+      console.log("Upserting merged match data to Supabase:", mergedMatchesPayload);
+      const { data, error } = await (supabase.from('matches') as any)
+        .upsert(mergedMatchesPayload, { onConflict: 'id' });
 
-      // 2. Upsert strictly into public.matches
-      const { error: matchErr } = await (supabase.from('matches') as any)
-        .upsert(uniqueMatches, { onConflict: 'id' });
-
-      if (matchErr) {
-        console.warn("Supabase matches upsert warning:", matchErr.message);
+      if (error) {
+        console.error("Upload error:", error);
+      } else {
+        console.log("Upload successful! Re-fetching matches from DB...");
       }
 
-      // 3. Mirror to DataService
-      await DataService.saveMatches(uniqueMatches.map(m => DataService.migrateMatch({
-        id: targetMatchId,
-        date: m.date,
-        opponent: m.opponent,
-        venue: m.home_away as any,
-        ourScore: m.our_score,
-        oppScore: m.opponent_score,
-        result: `${m.our_score > m.opponent_score ? 'W' : m.our_score < m.opponent_score ? 'L' : 'D'} (${m.our_score}-${m.opponent_score})`,
-        status: 'completed',
-        totalShots: m.shots,
-        shotsOnTarget: m.shots_on_target,
-        corners: 0,
-        isOpponentTeam: false,
-        ...m
-      })));
+      // Mirror to DataService
+      await DataService.saveMatches(mergedMatchesPayload.map(m => DataService.migrateMatch(m)));
 
       const successText = `Match data updated for match against ${fixture.opponent}`;
       setUploadStatus(successText);
       alert(successText);
 
-      // Reload fixtures
+      // Re-fetch matches from DB immediately to update UI instantly
       await loadFixtures();
       if (onFixturesUpdated) {
         onFixturesUpdated();
@@ -460,15 +406,40 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
     const dateMatches = allMatchData.filter(m => m.date === selectedAnalysisFixture.date);
 
     let homeData = targetMatch || dateMatches.find(m => m.teamName?.toLowerCase() === hTeam.toLowerCase());
-    let awayData = dateMatches.find(m => m.teamName?.toLowerCase() === aTeam.toLowerCase());
+    let awayData = dateMatches.find(m => m.teamName?.toLowerCase() === aTeam.toLowerCase() && m.id !== homeData?.id);
+
+    if (!awayData && targetMatch) {
+      const oppGoals = (targetMatch as any).opp_goals ?? targetMatch.oppScore ?? targetMatch.opponent_score ?? 0;
+      const oppShots = (targetMatch as any).opp_shots ?? 0;
+      const oppShotsOnTarget = (targetMatch as any).opp_shots_on_target ?? 0;
+      const oppPasses = (targetMatch as any).opp_passes ?? 0;
+      const oppSuccessfulPasses = (targetMatch as any).opp_successful_passes ?? 0;
+      const oppTacklesAttempted = (targetMatch as any).opp_tackles ?? 0;
+      const oppTacklesWon = (targetMatch as any).opp_tackles_won ?? 0;
+
+      awayData = {
+        id: `${targetMatch.id}_opp`,
+        opponent: "Cardiff Town FC",
+        isOpponentTeam: true,
+        date: targetMatch.date,
+        goals: oppGoals,
+        shots: oppShots,
+        shotsOnTarget: oppShotsOnTarget,
+        totalPasses: oppPasses,
+        successfulPasses: oppSuccessfulPasses,
+        tacklesAttempted: oppTacklesAttempted,
+        tacklesWon: oppTacklesWon,
+        possessionRate: 100 - (targetMatch.possessionRate || 50)
+      } as any;
+    }
 
     if (!homeData) {
       if (hTeam === "Cardiff Town FC") {
         homeData = dateMatches.find(m => !m.isOpponentTeam) || targetMatch;
-        awayData = dateMatches.find(m => m.isOpponentTeam);
+        awayData = dateMatches.find(m => m.isOpponentTeam) || awayData;
       } else {
         homeData = dateMatches[0] || targetMatch;
-        awayData = dateMatches[1];
+        awayData = dateMatches[1] || awayData;
       }
     }
 
