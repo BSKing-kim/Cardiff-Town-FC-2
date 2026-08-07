@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { MatchFixture, UserProfile, UserRole, CustomTeam, MatchData } from "../types";
 import { DataService } from "../lib/dataService";
 import { ExcelUtils } from "../lib/excelUtils";
@@ -18,7 +18,7 @@ interface MatchFixturesProps {
   onFixturesUpdated?: () => void;
 }
 
-export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFilter, onFixturesUpdated }: MatchFixturesProps) {
+export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFilter = "All", onFixturesUpdated }: MatchFixturesProps) {
   const [fixtures, setFixtures] = useState<MatchFixture[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -33,6 +33,8 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
     return () => window.removeEventListener("resize", handleResize);
   }, []);
   
+  const isUploadingRef = useRef(false);
+
   // Match-by-match excel upload state
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string>("");
@@ -43,41 +45,35 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
       return;
     }
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || isUploadingRef.current) return;
 
-    const targetMatchId = fixture.id;
-    setUploadingId(targetMatchId);
-    setUploadStatus(`Reading spreadsheet for match against ${fixture.opponent}...`);
+    const targetMatchId = String(fixture.id).trim();
 
     try {
+      isUploadingRef.current = true;
+      console.log("Starting single match upload for file:", file.name, "targetMatchId:", targetMatchId);
+      setUploadingId(targetMatchId);
+      setUploadStatus(`Reading spreadsheet for match against ${fixture.opponent}...`);
+
       // 1. Parse Excel file using parseMatchFixturesExcel
       const parsed = await parseMatchFixturesExcel(file);
-      const rawMatchList = parsed.data && parsed.data.length > 0 ? parsed.data : [{}];
-      
-      // Ensure exactly 1 object exists for this match_id
-      const uniqueMatchMap = new Map<string, any>();
-      rawMatchList.forEach((m: any) => {
-        const matchId = String(targetMatchId || m.match_id || m.id).trim();
-        const cleanMatchPayload = {
-          ...m,
-          id: matchId,
-          date: m.date || fixture.date,
-          opponent: m.opponent || fixture.opponent,
-          home_away: m.home_away || fixture.venue || 'Home',
-          our_score: m.our_score ?? m.goals ?? 0,
-          opponent_score: m.opponent_score ?? m.opp_goals ?? 0,
-          status: 'completed'
-        };
-        uniqueMatchMap.set(matchId, cleanMatchPayload);
-      });
+      const rawMatch = (parsed.data && parsed.data.length > 0 ? parsed.data[0] : {}) as any;
 
-      // Convert Map values back to array (Length MUST be 1 per fixture)
-      const finalPayloadArray = Array.from(uniqueMatchMap.values());
+      const singleMatchPayload = {
+        ...rawMatch,
+        id: targetMatchId, // Strictly fixed ID
+        date: rawMatch.date || fixture.date,
+        opponent: rawMatch.opponent || fixture.opponent,
+        home_away: rawMatch.home_away || fixture.venue || 'Home',
+        our_score: rawMatch.our_score ?? rawMatch.goals ?? 0,
+        opponent_score: rawMatch.opponent_score ?? rawMatch.opp_goals ?? 0,
+        status: 'completed'
+      };
 
-      // Detailed console logging
-      console.log("Final Upsert Payload Array (Length should be 1):", finalPayloadArray);
+      console.log("Upserting strictly 1 record:", singleMatchPayload);
+
       const { data, error } = await (supabase.from('matches') as any)
-        .upsert(finalPayloadArray, { onConflict: 'id' });
+        .upsert([singleMatchPayload], { onConflict: 'id' });
 
       if (error) {
         console.error("Upload error:", error);
@@ -86,14 +82,11 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
       }
 
       // Mirror to DataService
-      await DataService.saveMatches(finalPayloadArray.map(m => DataService.migrateMatch(m)));
+      await DataService.saveMatches([DataService.migrateMatch(singleMatchPayload)]);
 
       const successText = `Match data updated for match against ${fixture.opponent}`;
       setUploadStatus(successText);
       alert(successText);
-
-      // Reset file input value to prevent duplicate change event triggers
-      e.target.value = "";
 
       // Re-fetch matches from DB immediately to update UI instantly
       await loadFixtures();
@@ -107,15 +100,19 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
       }, 4000);
 
     } catch (err: any) {
-      console.error(err);
-      setUploadStatus(`Error: ${err.message || "Failed to process match data upload"}`);
-      alert(`Error: ${err.message || "Failed to process match data upload"}`);
+      console.error("Upload error:", err);
+      const errText = `Error: ${err.message || "Failed to process match data upload"}`;
+      setUploadStatus(errText);
+      alert(errText);
       setTimeout(() => {
         setUploadingId(null);
         setUploadStatus("");
-      }, 6000);
+      }, 4000);
     } finally {
-      e.target.value = "";
+      isUploadingRef.current = false;
+      if (e.target) {
+        e.target.value = "";
+      }
     }
   };
   
