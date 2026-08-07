@@ -8,7 +8,8 @@ import {
 } from "lucide-react";
 import TeamLogo from "./TeamLogo";
 import { LEAGUES } from "./TeamDashboard";
-import MatchFixturesBulkImport from "./MatchFixturesBulkImport";
+import { supabase } from "../lib/supabase";
+import { parseMatchFixturesExcel } from "../lib/excelUtils";
 
 interface MatchFixturesProps {
   currentUser: UserProfile;
@@ -36,7 +37,7 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string>("");
 
-  const handleFixtureFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, fixtureId: string) => {
+  const handleFixtureFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, fixture: MatchFixture) => {
     if (!isAuthorized) {
       alert("Uploading match statistics is reserved for Coaching Staff and Admins.");
       return;
@@ -44,31 +45,104 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setUploadingId(fixtureId);
-    setUploadStatus("Reading spreadsheet file...");
+    const targetMatchId = fixture.id;
+    setUploadingId(targetMatchId);
+    setUploadStatus(`Reading spreadsheet for match against ${fixture.opponent}...`);
 
     try {
-      // 1. Parse Excel file
-      const result = await ExcelUtils.parsePlayerMatchExcel(file);
-      if (result.errorRows > 0 && result.validRecords.length === 0) {
-        throw new Error(`Failed to parse file: ${result.errorDetails.join("; ")}`);
+      // 1. Parse Excel file using parseMatchFixturesExcel
+      const parsed = await parseMatchFixturesExcel(file);
+
+      const rawMatchList = parsed.data && parsed.data.length > 0 ? parsed.data : [{}];
+      const cleanMatchPayload = rawMatchList.map((m: any) => ({
+        id: targetMatchId,
+        date: m.date || fixture.date,
+        opponent: m.opponent || fixture.opponent,
+        home_away: m.home_away || fixture.venue || 'Home',
+        our_score: m.our_score ?? m.ourScore ?? 0,
+        opponent_score: m.opponent_score ?? m.oppScore ?? 0,
+        status: 'completed',
+
+        goals: m.goals ?? m.our_score ?? 0,
+        shots: m.shots ?? m.total_shots ?? 0,
+        shots_on_target: m.shots_on_target ?? 0,
+        passes: m.passes ?? 0,
+        successful_passes: m.successful_passes ?? 0,
+        backwards_passes: m.backwards_passes ?? 0,
+        forwards_passes: m.forwards_passes ?? 0,
+        long_passes: m.long_passes ?? 0,
+        successful_long_passes: m.successful_long_passes ?? 0,
+        key_passes: m.key_passes ?? 0,
+        successful_key_passes: m.successful_key_passes ?? 0,
+        through_balls: m.through_balls ?? 0,
+        successful_through_balls: m.successful_through_balls ?? 0,
+        crosses: m.crosses ?? 0,
+        successful_crosses: m.successful_crosses ?? 0,
+        dribbles: m.dribbles ?? 0,
+        successful_dribbles: m.successful_dribbles ?? 0,
+        duels: m.duels ?? 0,
+        duels_won: m.duels_won ?? 0,
+        aerial_duels: m.aerial_duels ?? 0,
+        aerial_duels_won: m.aerial_duels_won ?? 0,
+        ground_duels: m.ground_duels ?? 0,
+        ground_duels_won: m.ground_duels_won ?? 0,
+        ball_recoveries: m.ball_recoveries ?? 0,
+        tackles: m.tackles ?? 0,
+        tackles_won: m.tackles_won ?? 0,
+        interceptions: m.interceptions ?? 0,
+        clearances: m.clearances ?? 0,
+        blocks: m.blocks ?? 0,
+        own_goals: m.own_goals ?? 0,
+        turnovers: m.turnovers ?? 0,
+        miscontrols: m.miscontrols ?? 0,
+        unsuccessful_dribbles: m.unsuccessful_dribbles ?? 0,
+        possession_lost: m.possession_lost ?? 0,
+        offsides: m.offsides ?? 0,
+        fouls: m.fouls ?? 0,
+        yellow_cards: m.yellow_cards ?? 0,
+        red_cards: m.red_cards ?? 0
+      }));
+
+      // Deduplicate by match_id
+      const matchMap = new Map<string, any>();
+      cleanMatchPayload.forEach(row => matchMap.set(String(row.id).trim(), row));
+      const uniqueMatches = Array.from(matchMap.values());
+
+      // 2. Upsert strictly into public.matches
+      const { error: matchErr } = await (supabase.from('matches') as any)
+        .upsert(uniqueMatches, { onConflict: 'id' });
+
+      if (matchErr) {
+        console.warn("Supabase matches upsert warning:", matchErr.message);
       }
 
-      setUploadStatus("Processing match statistics & updating roster...");
+      // 3. Mirror to DataService
+      await DataService.saveMatches(uniqueMatches.map(m => DataService.migrateMatch({
+        id: targetMatchId,
+        date: m.date,
+        opponent: m.opponent,
+        venue: m.home_away as any,
+        ourScore: m.our_score,
+        oppScore: m.opponent_score,
+        result: `${m.our_score > m.opponent_score ? 'W' : m.our_score < m.opponent_score ? 'L' : 'D'} (${m.our_score}-${m.opponent_score})`,
+        status: 'completed',
+        totalShots: m.shots,
+        shotsOnTarget: m.shots_on_target,
+        corners: 0,
+        isOpponentTeam: false,
+        ...m
+      })));
 
-      // 2. Call DataService to process the match upload
-      const response = await DataService.processFixtureMatchUpload(fixtureId, result.validRecords);
+      const successText = `Match data updated for match against ${fixture.opponent}`;
+      setUploadStatus(successText);
+      alert(successText);
 
-      setUploadStatus(`Success! Result: ${response.ourScore}:${response.oppScore}. ${response.playersUpdated} roster players updated${response.deleted ? `, ${response.deleted} stale records purged` : ""}.`);
-      
       // Reload fixtures
       await loadFixtures();
-
       if (onFixturesUpdated) {
         onFixturesUpdated();
       }
 
-      // Clear after 4 seconds
       setTimeout(() => {
         setUploadingId(null);
         setUploadStatus("");
@@ -76,13 +150,13 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
 
     } catch (err: any) {
       console.error(err);
-      setUploadStatus(`Error: ${err.message || "Failed to process excel upload"}`);
+      setUploadStatus(`Error: ${err.message || "Failed to process match data upload"}`);
+      alert(`Error: ${err.message || "Failed to process match data upload"}`);
       setTimeout(() => {
         setUploadingId(null);
         setUploadStatus("");
       }, 6000);
     } finally {
-      // Reset input element value
       e.target.value = "";
     }
   };
@@ -484,19 +558,28 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
           </div>
 
           {isAuthorized && (
-            <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="flex items-center gap-1.5 rounded-xl bg-[#eab308] hover:bg-[#f59e0b] px-3.5 py-2 text-xs font-black text-[#0b0f19] shadow-md transition-all cursor-pointer"
-            >
-              <Plus className="h-4 w-4 shrink-0" />
-              <span>{isMobile ? "New" : (showAddForm ? "Close Form" : "Schedule New Match")}</span>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => ExcelUtils.downloadMatchFixturesTemplate()}
+                className="flex items-center gap-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-2 text-xs font-bold text-emerald-300 shadow-md transition-all cursor-pointer shrink-0"
+                title="Download Match Fixtures Excel Template"
+              >
+                <Download className="h-3.5 w-3.5 shrink-0" />
+                <span>{isMobile ? "Template" : "Download Template"}</span>
+              </button>
+
+              <button
+                onClick={() => setShowAddForm(!showAddForm)}
+                className="flex items-center gap-1.5 rounded-xl bg-[#eab308] hover:bg-[#f59e0b] px-3.5 py-2 text-xs font-black text-[#0b0f19] shadow-md transition-all cursor-pointer"
+              >
+                <Plus className="h-4 w-4 shrink-0" />
+                <span>{isMobile ? "New" : (showAddForm ? "Close Form" : "Schedule New Match")}</span>
+              </button>
+            </>
           )}
         </div>
       </div>
-
-      {/* Dedicated Import Section: Match Fixture Bulk Import (uses Match_Fixtures_Template.xlsx) */}
-      <MatchFixturesBulkImport currentUser={currentUser} />
 
       {/* Admin Panel to Add Fixture */}
       {showAddForm && isAuthorized && (
@@ -812,25 +895,28 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                       {/* Actions Column (Rightmost) */}
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          
-                          {/* ⬆️ Upload Data Icon/Button */}
-                          {isAuthorized && !isPlayed && (
+                          {/* Upload Data Button */}
+                          {isAuthorized && (
                             <>
                               <input
                                 type="file"
                                 id={`table-upload-${f.id}`}
                                 className="hidden"
-                                accept=".xlsx,.xls"
-                                onChange={(e) => handleFixtureFileUpload(e, f.id)}
+                                accept=".xlsx,.xls,.csv"
+                                onChange={(e) => handleFixtureFileUpload(e, f)}
                               />
                               <button
                                 onClick={() => document.getElementById(`table-upload-${f.id}`)?.click()}
-                                className="p-1.5 rounded-lg bg-[#eab308] hover:bg-[#f59e0b] text-[#0b0f19] font-bold transition-all cursor-pointer shadow-xs"
-                                title="Upload match Excel statistics ⬆️"
+                                className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg bg-[#eab308] hover:bg-[#f59e0b] text-[#0b0f19] text-xs font-black transition-all cursor-pointer shadow-xs shrink-0"
+                                title={`Upload Excel match data for match against ${awayTeam}`}
                               >
-                                <Upload className="h-4 w-4 shrink-0" />
+                                <Upload className="h-3.5 w-3.5 shrink-0" />
+                                <span>Upload Data</span>
                               </button>
-                              <button
+                            </>
+                          )}
+                          {!isPlayed && (
+                            <button
                                 onClick={async () => {
                                   const input = window.prompt(`Enter result for ${awayTeam} vs ${homeTeam}\nFormat: AwayScore-HomeScore (e.g. 2-1):`);
                                   if (!input) return;
@@ -855,7 +941,6 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                                 <Edit3 className="h-3.5 w-3.5 text-[#eab308]" />
                                 <span>Score</span>
                               </button>
-                            </>
                           )}
 
                           {/* Analysis Button for Concluded Matches */}
@@ -1004,48 +1089,53 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
 
                   {/* Actions */}
                   <div className="flex items-center gap-1.5">
-                    {isAuthorized && !isPlayed && (
+                    {/* Upload Data Button */}
+                    {isAuthorized && (
                       <>
                         <input
                           type="file"
                           id={`upload-${f.id}`}
                           className="hidden"
-                          accept=".xlsx,.xls"
-                          onChange={(e) => handleFixtureFileUpload(e, f.id)}
+                          accept=".xlsx,.xls,.csv"
+                          onChange={(e) => handleFixtureFileUpload(e, f)}
                         />
                         <button
                           onClick={() => document.getElementById(`upload-${f.id}`)?.click()}
-                          className="p-1.5 rounded-lg bg-[#eab308] hover:bg-[#f59e0b] text-[#0b0f19] font-bold transition-all cursor-pointer"
-                          title="Upload match Excel statistics ⬆️"
+                          className="flex items-center gap-1.5 py-1 px-2.5 rounded-lg bg-[#eab308] hover:bg-[#f59e0b] text-[#0b0f19] text-xs font-black transition-all cursor-pointer shadow-xs shrink-0"
+                          title={`Upload Excel match data for match against ${awayTeam}`}
                         >
                           <Upload className="h-3.5 w-3.5 shrink-0" />
-                        </button>
-                        <button
-                          onClick={async () => {
-                            const input = window.prompt(`Enter result for ${awayTeam} vs ${homeTeam}\nFormat: AwayScore-HomeScore (e.g. 2-1):`);
-                            if (!input) return;
-                            const parts = input.split("-").map(p => p.trim());
-                            if (parts.length === 2 && !isNaN(Number(parts[0])) && !isNaN(Number(parts[1]))) {
-                              const aScore = Number(parts[0]);
-                              const hScore = Number(parts[1]);
-                              try {
-                                await DataService.updateFixtureManualScore(f.id, hScore, aScore);
-                                await loadFixtures();
-                                if (onFixturesUpdated) onFixturesUpdated();
-                              } catch (err: any) {
-                                alert("Failed to update score: " + err.message);
-                              }
-                            } else {
-                              alert("Invalid score format. Please use format AwayScore-HomeScore e.g. 2-1");
-                            }
-                          }}
-                          className="px-2 py-1 rounded-lg bg-[#0b0f19] hover:bg-[#334155] text-white border border-[#334155] text-[10px] font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1"
-                          title="Enter match score manually ⚽"
-                        >
-                          <Edit3 className="h-3 w-3 text-[#eab308]" />
-                          <span>Score</span>
+                          <span>Upload Data</span>
                         </button>
                       </>
+                    )}
+
+                    {!isPlayed && isAuthorized && (
+                      <button
+                        onClick={async () => {
+                          const input = window.prompt(`Enter result for ${awayTeam} vs ${homeTeam}\nFormat: AwayScore-HomeScore (e.g. 2-1):`);
+                          if (!input) return;
+                          const parts = input.split("-").map(p => p.trim());
+                          if (parts.length === 2 && !isNaN(Number(parts[0])) && !isNaN(Number(parts[1]))) {
+                            const aScore = Number(parts[0]);
+                            const hScore = Number(parts[1]);
+                            try {
+                              await DataService.updateFixtureManualScore(f.id, hScore, aScore);
+                              await loadFixtures();
+                              if (onFixturesUpdated) onFixturesUpdated();
+                            } catch (err: any) {
+                              alert("Failed to update score: " + err.message);
+                            }
+                          } else {
+                            alert("Invalid score format. Please use format AwayScore-HomeScore e.g. 2-1");
+                          }
+                        }}
+                        className="px-2 py-1 rounded-lg bg-[#0b0f19] hover:bg-[#334155] text-white border border-[#334155] text-[10px] font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1"
+                        title="Enter match score manually ⚽"
+                      >
+                        <Edit3 className="h-3 w-3 text-[#eab308]" />
+                        <span>Score</span>
+                      </button>
                     )}
 
                     {isPlayed && (
