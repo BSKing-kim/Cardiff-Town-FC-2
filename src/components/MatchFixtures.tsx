@@ -1188,9 +1188,24 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
       )}
 
       {selectedAnalysisFixture && (() => {
-        const hTeam = selectedAnalysisFixture.homeTeam || "Cardiff Town FC";
-        const aTeam = selectedAnalysisFixture.awayTeam || selectedAnalysisFixture.opponent;
+        const hTeam = selectedAnalysisFixture.homeTeam || (selectedAnalysisFixture.venue === "Away" ? selectedAnalysisFixture.opponent : "Cardiff Town FC");
+        const aTeam = selectedAnalysisFixture.awayTeam || (selectedAnalysisFixture.venue === "Home" ? selectedAnalysisFixture.opponent : "Cardiff Town FC");
         
+        // Determine scores dynamically from the match data payload
+        const rawHomeGoals = analysisData?.homeData?.goals ?? (selectedAnalysisFixture as any).goals;
+        const rawAwayGoals = analysisData?.awayData?.goals ?? (selectedAnalysisFixture as any).opp_goals;
+
+        const homeScoreVal = selectedAnalysisFixture.venue === "Home" || (selectedAnalysisFixture as any).home_away === "Home"
+          ? (analysisData?.homeData?.goals ?? selectedAnalysisFixture.ourScore ?? rawHomeGoals ?? 0)
+          : (analysisData?.awayData?.goals ?? selectedAnalysisFixture.oppScore ?? rawAwayGoals ?? 0);
+
+        const awayScoreVal = selectedAnalysisFixture.venue === "Away" || (selectedAnalysisFixture as any).home_away === "Away"
+          ? (analysisData?.homeData?.goals ?? selectedAnalysisFixture.ourScore ?? rawHomeGoals ?? 0)
+          : (analysisData?.awayData?.goals ?? selectedAnalysisFixture.oppScore ?? rawAwayGoals ?? 0);
+
+        const leftHeaderScore = analysisData?.homeData?.goals ?? (selectedAnalysisFixture as any).opp_goals ?? (selectedAnalysisFixture as any).opponent_score ?? homeScoreVal;
+        const rightHeaderScore = analysisData?.awayData?.goals ?? (selectedAnalysisFixture as any).goals ?? (selectedAnalysisFixture as any).our_score ?? awayScoreVal;
+
         return (
           <div id="match-analysis-modal-overlay" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
             <div className={`bg-white rounded-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 flex flex-col transition-all duration-300 ${activeAnalysisTab === "heatmap" ? "max-w-4xl" : "max-w-2xl"}`}>
@@ -1249,7 +1264,7 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
 
                   <div className="flex flex-col items-center justify-center gap-1">
                     <div className="text-2xl sm:text-3xl font-black font-mono tracking-tight bg-white/10 px-4 py-1.5 rounded-xl border border-white/10">
-                      {selectedAnalysisFixture.homeScore ?? 0} : {selectedAnalysisFixture.awayScore ?? 0}
+                      {leftHeaderScore} : {rightHeaderScore}
                     </div>
                   </div>
 
