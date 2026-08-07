@@ -1298,7 +1298,7 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
 
         return (
           <div id="match-analysis-modal-overlay" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
-            <div className={`bg-white rounded-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 flex flex-col transition-all duration-300 ${activeAnalysisTab === "heatmap" ? "max-w-4xl" : "max-w-2xl"}`}>
+            <div className={`bg-white rounded-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 flex flex-col transition-all duration-300 ${activeAnalysisTab === "heatmap" ? "max-w-4xl" : "max-w-7xl w-[92vw]"}`}>
               
               {/* Modal Header */}
               <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-2xl">
@@ -1451,7 +1451,7 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                     ];
 
                     const detailedMetricList = [
-                      { label: "Possession", homeVal: `${Number(analysisData?.homeData?.possessionRate ?? 50).toFixed(1)}%`, awayVal: `${Number(analysisData?.awayData?.possessionRate ?? 50).toFixed(1)}%` },
+                      { label: "Possession (%)", homeVal: `${Number(analysisData?.homeData?.possessionRate ?? 50).toFixed(1)}%`, awayVal: `${Number(analysisData?.awayData?.possessionRate ?? 50).toFixed(1)}%` },
                       { label: "Goals", homeVal: analysisData?.homeData?.goals ?? 0, awayVal: analysisData?.awayData?.goals ?? 0 },
                       { label: "Shot", homeVal: analysisData?.homeData?.shots ?? 0, awayVal: analysisData?.awayData?.shots ?? 0 },
                       { label: "SOT", homeVal: analysisData?.homeData?.shotsOnTarget ?? 0, awayVal: analysisData?.awayData?.shotsOnTarget ?? 0 },
@@ -1488,55 +1488,83 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
 
                     return (
                       <div className="space-y-6">
-                        {/* Middle Section: Donut Graphs for 9 Percentage (%) Metrics */}
+                        {/* Middle Section: Dual Donut Charts (Home vs Away) for 9 Percentage (%) Metrics */}
                         <div className="space-y-3">
                           <h4 className="text-xs font-bold text-[#0A2342] uppercase tracking-wider font-display flex items-center gap-2">
                             <PieChart className="h-4 w-4 text-[#1D4ED8]" />
-                            <span>Efficiency & Success Donut Charts</span>
+                            <span>Efficiency & Success Donut Charts (Home vs Away)</span>
                           </h4>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {percentageMetrics.map((pm) => {
-                              const radius = 28;
+                              const radius = 23;
                               const stroke = 5;
-                              const normalizedRadius = radius - stroke * 0.5;
-                              const circumference = normalizedRadius * 2 * Math.PI;
-                              const homeStrokeDashoffset = circumference - (pm.homePct / 100) * circumference;
+                              const circumference = 2 * Math.PI * radius;
+                              const homeDashOffset = circumference - (pm.homePct / 100) * circumference;
+                              const awayDashOffset = circumference - (pm.awayPct / 100) * circumference;
 
                               return (
-                                <div key={pm.title} className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex flex-col items-center justify-between text-center shadow-2xs">
-                                  <span className="text-[10px] font-extrabold text-[#0A2342] uppercase tracking-wider mb-1 font-display truncate w-full" title={pm.title}>
+                                <div key={pm.title} className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 flex flex-col items-center justify-between text-center shadow-2xs">
+                                  {/* Card Title */}
+                                  <span className="text-xs font-extrabold text-[#0A2342] uppercase tracking-wider mb-2 font-display">
                                     {pm.title}
                                   </span>
-                                  <div className="relative flex items-center justify-center my-1">
-                                    <svg height={radius * 2} width={radius * 2} className="transform -rotate-90">
-                                      <circle
-                                        stroke="#e2e8f0"
-                                        fill="transparent"
-                                        strokeWidth={stroke}
-                                        r={normalizedRadius}
-                                        cx={radius}
-                                        cy={radius}
-                                      />
-                                      <circle
-                                        stroke="#1D4ED8"
-                                        fill="transparent"
-                                        strokeWidth={stroke}
-                                        strokeDasharray={`${circumference} ${circumference}`}
-                                        style={{ strokeDashoffset: homeStrokeDashoffset }}
-                                        strokeLinecap="round"
-                                        r={normalizedRadius}
-                                        cx={radius}
-                                        cy={radius}
-                                        className="transition-all duration-500"
-                                      />
-                                    </svg>
-                                    <div className="absolute flex flex-col items-center justify-center font-mono">
-                                      <span className="text-[11px] font-black text-[#1D4ED8]">{pm.homePct.toFixed(0)}%</span>
+
+                                  {/* Dual Donut Charts Side-by-Side */}
+                                  <div className="grid grid-cols-3 items-center w-full my-1">
+                                    {/* Left: Home Team Donut Chart */}
+                                    <div className="flex flex-col items-center gap-1">
+                                      <div className="relative flex items-center justify-center">
+                                        <svg height={56} width={56} className="transform -rotate-90">
+                                          <circle stroke="#e2e8f0" fill="transparent" strokeWidth={stroke} r={radius} cx={28} cy={28} />
+                                          <circle
+                                            stroke="#1D4ED8"
+                                            fill="transparent"
+                                            strokeWidth={stroke}
+                                            strokeDasharray={`${circumference} ${circumference}`}
+                                            style={{ strokeDashoffset: homeDashOffset }}
+                                            strokeLinecap="round"
+                                            r={radius}
+                                            cx={28}
+                                            cy={28}
+                                            className="transition-all duration-500"
+                                          />
+                                        </svg>
+                                        <span className="absolute text-[10px] font-black text-[#1D4ED8] font-mono">{pm.homePct.toFixed(0)}%</span>
+                                      </div>
+                                      <span className="text-[9px] font-bold text-[#1D4ED8] uppercase truncate max-w-[75px]" title={hTeam}>
+                                        Home ({pm.homePct.toFixed(1)}%)
+                                      </span>
                                     </div>
-                                  </div>
-                                  <div className="flex items-center justify-between w-full text-[9px] font-bold mt-1.5 pt-1.5 border-t border-slate-200/60 font-sans">
-                                    <span className="text-[#1D4ED8]">H: {pm.homePct.toFixed(1)}%</span>
-                                    <span className="text-emerald-600">A: {pm.awayPct.toFixed(1)}%</span>
+
+                                    {/* Center: VS Indicator */}
+                                    <div className="flex flex-col items-center justify-center">
+                                      <span className="text-[10px] font-mono font-bold text-slate-400">VS</span>
+                                    </div>
+
+                                    {/* Right: Away Team Donut Chart */}
+                                    <div className="flex flex-col items-center gap-1">
+                                      <div className="relative flex items-center justify-center">
+                                        <svg height={56} width={56} className="transform -rotate-90">
+                                          <circle stroke="#e2e8f0" fill="transparent" strokeWidth={stroke} r={radius} cx={28} cy={28} />
+                                          <circle
+                                            stroke="#10b981"
+                                            fill="transparent"
+                                            strokeWidth={stroke}
+                                            strokeDasharray={`${circumference} ${circumference}`}
+                                            style={{ strokeDashoffset: awayDashOffset }}
+                                            strokeLinecap="round"
+                                            r={radius}
+                                            cx={28}
+                                            cy={28}
+                                            className="transition-all duration-500"
+                                          />
+                                        </svg>
+                                        <span className="absolute text-[10px] font-black text-emerald-600 font-mono">{pm.awayPct.toFixed(0)}%</span>
+                                      </div>
+                                      <span className="text-[9px] font-bold text-emerald-600 uppercase truncate max-w-[75px]" title={aTeam}>
+                                        Away ({pm.awayPct.toFixed(1)}%)
+                                      </span>
+                                    </div>
                                   </div>
                                 </div>
                               );
@@ -1548,7 +1576,7 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                         <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-2 shadow-sm">
                           <div className="text-xs font-extrabold text-[#0A2342] uppercase tracking-wider border-b border-slate-200 pb-2 mb-3 font-display flex items-center justify-between">
                             <span className="text-[#1D4ED8] font-bold">{hTeam} (Home)</span>
-                            <span className="text-slate-400 font-mono text-[10px]">DETAILED METRIC LIST</span>
+                            <span className="text-slate-400 font-mono text-[10px]">DETAILED NUMERIC LIST</span>
                             <span className="text-emerald-600 font-bold">{aTeam} (Away)</span>
                           </div>
                           <div className="divide-y divide-slate-200/60">

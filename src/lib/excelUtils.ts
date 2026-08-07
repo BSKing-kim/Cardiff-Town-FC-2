@@ -294,7 +294,7 @@ export const parseMatchFixturesExcel = async (file: File): Promise<{ count: numb
   };
 
   const cleanMatchPayloads = rawRows.map(row => {
-    const matchId = extractString(row, ['match_id', 'Match ID', 'Game ID', 'ID']) || `M-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    const matchId = extractString(row, ['match_id', 'Match ID', 'Game ID', 'ID']) || 'MATCH_01';
     const date = extractString(row, ['date', 'Date', 'Match Date']) || new Date().toISOString().split('T')[0];
     const opponent = extractString(row, ['opponent', 'Opponent', 'Opponent Team', 'VS']) || 'Opponent Team';
     const homeAway = extractString(row, ['home_away', 'Home/Away', 'Venue', 'homeAway']) || 'Home';
