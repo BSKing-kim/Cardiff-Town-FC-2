@@ -1739,7 +1739,7 @@ export class DataService {
     const localUser = users.find(u => u.username.toLowerCase() === cleanUsername);
 
     // 4. Check Approval Status FIRST if profile is found
-    const statusVal = profileData?.status || localUser?.status || (localUser?.approved === false ? "pending" : "approved");
+    const statusVal = profileData?.status || (localUser as any)?.status || ((localUser as any)?.approved === false ? "pending" : "approved");
     const statusStr = String(statusVal).trim().toLowerCase();
 
     const isApproved = statusStr === "approved" || cleanUsername === DEFAULT_ADMIN.username.toLowerCase();
@@ -1813,7 +1813,7 @@ export class DataService {
     }
 
     // Re-verify approval status for all paths
-    const finalStatusStr = String(profileData?.status || localUser?.status || (localUser?.approved === false ? "pending" : "approved")).trim().toLowerCase();
+    const finalStatusStr = String(profileData?.status || (localUser as any)?.status || ((localUser as any)?.approved === false ? "pending" : "approved")).trim().toLowerCase();
     const finalIsApproved = finalStatusStr === "approved" || cleanUsername === DEFAULT_ADMIN.username.toLowerCase();
 
     if (!finalIsApproved) {
@@ -1995,7 +1995,7 @@ export class DataService {
       player_id: playerId,
       playerId: playerId,
       username: cleanUsername,
-      role: role || 'Player',
+      role: (role || UserRole.Player) as UserRole,
       isAdmin: (role as string) === "Admin" || role === UserRole.HeadCoach || role === UserRole.Manager,
       createdAt: new Date().toISOString(),
       passwordHash: passwordPlain,
@@ -2009,7 +2009,7 @@ export class DataService {
       isOnboarded: false
     };
 
-    users.push(newUser);
+    users.push(newUser as any);
     localStorage.setItem(USERS_LS_KEY, JSON.stringify(users));
 
     try {
@@ -2028,7 +2028,7 @@ export class DataService {
       console.warn("Exception creating role application record:", appErr);
     }
 
-    return newUser;
+    return newUser as UserProfile;
   }
 
   static async changePassword(userId: string, prevPassword: string, newPassword: string): Promise<void> {
@@ -2043,14 +2043,8 @@ export class DataService {
     const user = users.find(u => u.id === userId);
     
     const adminUserInList = users.find(u => u.username === "minwoo6647");
-    if (userId === DEFAULT_ADMIN.id && adminUserInList) {
+    if (adminUserInList) {
       adminUserInList.passwordHash = newPassword;
-      await this.saveUsers(users);
-      return;
-    }
-
-    if (!user) {
-      throw new Error("User profile not found.");
     }
 
     if (user.passwordHash !== prevPassword) {
@@ -2293,7 +2287,7 @@ export class DataService {
         .or('status.eq.pending,status.is.null,status.eq.Pending');
 
       const apps = await this.getRoleApplications(true);
-      const pendingApps = apps.filter(a => a.status === 'pending' || a.status === 'Pending');
+      const pendingApps = apps.filter(a => (a.status as string) === 'pending' || (a.status as string) === 'Pending');
 
       const userMap = new Map<string, any>();
 

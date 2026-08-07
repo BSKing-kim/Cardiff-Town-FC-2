@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { DataService } from "../lib/dataService";
+import { supabase } from "../lib/supabase";
 import { UserProfile, UserRole } from "../types";
 import { Check, ShieldAlert, Sparkles, UserPlus, LogIn, HardDrive, Eye, EyeOff, KeyRound, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 
