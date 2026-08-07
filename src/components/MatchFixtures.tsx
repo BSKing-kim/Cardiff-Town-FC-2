@@ -913,34 +913,38 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                   const isCardiffHome = f.venue === "Home" || (f as any).home_away === "Home" || f.homeTeam === "Cardiff Town FC";
                   const homeTeam = isCardiffHome ? "Cardiff Town FC" : f.opponent;
                   const awayTeam = isCardiffHome ? f.opponent : "Cardiff Town FC";
-
-                  const rawOurScore = (f as any).our_score ?? (f as any).goals ?? f.ourScore;
-                  const rawOppScore = (f as any).opponent_score ?? (f as any).opp_goals ?? f.oppScore;
-                  const hasScore = (rawOurScore !== undefined && rawOurScore !== null) && 
-                                   (rawOppScore !== undefined && rawOppScore !== null);
-                  const isPlayed = f.status === "Played" || f.status === "Completed" || f.status === "completed" || hasScore;
-
-                  const matchDataRecord = allMatchData.find(m => 
+                  
+                  // Single-row DB lookup: find ONE record matching this fixture ID
+                  const matchRecord = allMatchData.find(m => 
                     String(m.id).trim() === String(f.id).trim() ||
-                    String((m as any).fixtureId).trim() === String(f.id).trim()
-                  ) || (f as any);
-
-                  const isAnalysisAvailable = Boolean(
-                    (matchDataRecord && (
-                      matchDataRecord.status === 'completed' || 
-                      matchDataRecord.status === 'Completed' || 
-                      (matchDataRecord as any).our_score !== undefined || 
-                      (matchDataRecord as any).goals !== undefined ||
-                      (matchDataRecord as any).shots !== undefined
-                    )) ||
-                    isPlayed ||
-                    hasScore
+                    String((m as any).match_id).trim() === String(f.id).trim()
                   );
 
-                  const displayOurScore = rawOurScore ?? 0;
-                  const displayOppScore = rawOppScore ?? 0;
-                  const homeScore = isCardiffHome ? displayOurScore : displayOppScore;
-                  const awayScore = isCardiffHome ? displayOppScore : displayOurScore;
+                  // Score extraction: support both snake_case (raw DB) and camelCase (migrateMatch output)
+                  const rawOurScore = matchRecord != null
+                    ? ((matchRecord as any).our_score ?? (matchRecord as any).ourScore ?? (matchRecord as any).goals)
+                    : undefined;
+                  const rawOppScore = matchRecord != null
+                    ? ((matchRecord as any).opponent_score ?? (matchRecord as any).oppScore ?? (matchRecord as any).opp_goals)
+                    : undefined;
+                  const displayOurScore = rawOurScore ?? (f as any).our_score ?? (f as any).goals ?? f.ourScore;
+                  const displayOppScore = rawOppScore ?? (f as any).opponent_score ?? (f as any).opp_goals ?? f.oppScore;
+
+                  // A score is valid even when it is 0 — only treat undefined/null/'-' as absent
+                  const isValidScore = (v: any) => v !== undefined && v !== null && v !== '' && v !== '-';
+                  const hasScore = isValidScore(displayOurScore) && isValidScore(displayOppScore);
+
+                  // Uploaded = any single valid match record exists in the DB for this fixture
+                  const isMatchUploaded = Boolean(
+                    matchRecord || hasScore ||
+                    f.status === 'Played' || f.status === 'Completed' || f.status === 'completed'
+                  );
+
+                  const isPlayed = isMatchUploaded || hasScore;
+                  const isAnalysisAvailable = isMatchUploaded;
+
+                  const homeScore = isCardiffHome ? (isValidScore(displayOurScore) ? displayOurScore : '-') : (isValidScore(displayOppScore) ? displayOppScore : '-');
+                  const awayScore = isCardiffHome ? (isValidScore(displayOppScore) ? displayOppScore : '-') : (isValidScore(displayOurScore) ? displayOurScore : '-');
 
                   return (
                     <tr 
@@ -1107,33 +1111,37 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
             const homeTeam = isCardiffHome ? "Cardiff Town FC" : f.opponent;
             const awayTeam = isCardiffHome ? f.opponent : "Cardiff Town FC";
 
-            const rawOurScore = (f as any).our_score ?? (f as any).goals ?? f.ourScore;
-            const rawOppScore = (f as any).opponent_score ?? (f as any).opp_goals ?? f.oppScore;
-            const hasScore = (rawOurScore !== undefined && rawOurScore !== null) && 
-                             (rawOppScore !== undefined && rawOppScore !== null);
-            const isPlayed = f.status === "Played" || f.status === "Completed" || f.status === "completed" || hasScore;
-
-            const matchDataRecord = allMatchData.find(m => 
+            // Single-row DB lookup: find ONE record matching this fixture ID
+            const matchRecord = allMatchData.find(m => 
               String(m.id).trim() === String(f.id).trim() ||
-              String((m as any).fixtureId).trim() === String(f.id).trim()
-            ) || (f as any);
-
-            const isAnalysisAvailable = Boolean(
-              (matchDataRecord && (
-                matchDataRecord.status === 'completed' || 
-                matchDataRecord.status === 'Completed' || 
-                (matchDataRecord as any).our_score !== undefined || 
-                (matchDataRecord as any).goals !== undefined ||
-                (matchDataRecord as any).shots !== undefined
-              )) ||
-              isPlayed ||
-              hasScore
+              String((m as any).match_id).trim() === String(f.id).trim()
             );
 
-            const displayOurScore = rawOurScore ?? 0;
-            const displayOppScore = rawOppScore ?? 0;
-            const homeScore = isCardiffHome ? displayOurScore : displayOppScore;
-            const awayScore = isCardiffHome ? displayOppScore : displayOppScore;
+            // Score extraction: support both snake_case (raw DB) and camelCase (migrateMatch output)
+            const rawOurScore = matchRecord != null
+              ? ((matchRecord as any).our_score ?? (matchRecord as any).ourScore ?? (matchRecord as any).goals)
+              : undefined;
+            const rawOppScore = matchRecord != null
+              ? ((matchRecord as any).opponent_score ?? (matchRecord as any).oppScore ?? (matchRecord as any).opp_goals)
+              : undefined;
+            const displayOurScore = rawOurScore ?? (f as any).our_score ?? (f as any).goals ?? f.ourScore;
+            const displayOppScore = rawOppScore ?? (f as any).opponent_score ?? (f as any).opp_goals ?? f.oppScore;
+
+            // A score is valid even when it is 0 — only treat undefined/null/'-' as absent
+            const isValidScore = (v: any) => v !== undefined && v !== null && v !== '' && v !== '-';
+            const hasScore = isValidScore(displayOurScore) && isValidScore(displayOppScore);
+
+            // Uploaded = any single valid match record exists in the DB for this fixture
+            const isMatchUploaded = Boolean(
+              matchRecord || hasScore ||
+              f.status === 'Played' || f.status === 'Completed' || f.status === 'completed'
+            );
+
+            const isPlayed = isMatchUploaded || hasScore;
+            const isAnalysisAvailable = isMatchUploaded;
+
+            const homeScore = isCardiffHome ? (isValidScore(displayOurScore) ? displayOurScore : '-') : (isValidScore(displayOppScore) ? displayOppScore : '-');
+            const awayScore = isCardiffHome ? (isValidScore(displayOppScore) ? displayOppScore : '-') : (isValidScore(displayOurScore) ? displayOurScore : '-');
 
             return (
               <div 
