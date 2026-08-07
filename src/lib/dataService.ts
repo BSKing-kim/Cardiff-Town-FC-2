@@ -96,27 +96,35 @@ export class DataService {
   }
 
   static migrateMatch(m: any): MatchData {
+    const ourScore = Number(m.ourScore ?? m.our_score ?? m.goals ?? 0);
+    const oppScore = Number(m.oppScore ?? m.opponent_score ?? m.opponentScore ?? 0);
     const insideBoxShots = Number(m.insideBoxShots ?? m.boxShots ?? 0);
     const totalPasses = Number(m.totalPasses ?? m.passes ?? 0);
-    const progressivePasses = Number(m.progressivePasses ?? m.forwardPasses ?? 0);
-    const tacklesWon = Number(m.tacklesWon ?? m.tacklesSucceeded ?? 0);
-    const ballRecoveries = Number(m.ballRecoveries ?? m.recoveries ?? 0);
+    const progressivePasses = Number(m.progressivePasses ?? m.forwards_passes ?? m.forwardPasses ?? 0);
+    const tacklesWon = Number(m.tacklesWon ?? m.tackles_won ?? m.tacklesSucceeded ?? 0);
+    const ballRecoveries = Number(m.ballRecoveries ?? m.ball_recoveries ?? m.recoveries ?? 0);
     const crossesAttempted = Number(m.crossesAttempted ?? m.crosses ?? 0);
-    const successfulCrosses = Number(m.successfulCrosses ?? Math.round(crossesAttempted * (m.crossSuccessRate ?? 0) / 100));
-    const successfulPasses = Number(m.successfulPasses ?? Math.round(totalPasses * (m.passSuccessRate ?? 0) / 100));
+    const successfulCrosses = Number(m.successfulCrosses ?? m.successful_crosses ?? Math.round(crossesAttempted * (m.crossSuccessRate ?? 0) / 100));
+    const successfulPasses = Number(m.successfulPasses ?? m.successful_passes ?? Math.round(totalPasses * (m.passSuccessRate ?? 0) / 100));
+    const shotsOnTarget = Number(m.shotsOnTarget ?? m.shots_on_target ?? 0);
+
+    const resultStr = m.result || `${ourScore > oppScore ? 'W' : ourScore < oppScore ? 'L' : 'D'} (${ourScore}-${oppScore})`;
 
     return {
-      id: m.id || "",
-      fixtureId: m.fixtureId || undefined,
+      id: m.id || m.match_id || "",
+      fixtureId: m.fixtureId || m.match_id || undefined,
       date: m.date || "2026-06-22",
       competition: m.competition || "League",
       opponent: m.opponent || "Unknown Opponent",
-      venue: m.venue || (m.isOpponentTeam ? "Away" : "Home"),
-      result: m.result || "D (0-0)",
+      venue: m.venue || m.home_away || (m.isOpponentTeam ? "Away" : "Home"),
+      result: resultStr,
+      ourScore,
+      oppScore,
+      status: m.status || (m.our_score !== undefined ? 'completed' : 'scheduled'),
       isOpponentTeam: !!m.isOpponentTeam,
       
       shots: Number(m.shots) || 0,
-      shotsOnTarget: Number(m.shotsOnTarget) || 0,
+      shotsOnTarget,
       insideBoxShots,
       crossesAttempted,
       successfulCrosses,
@@ -125,23 +133,23 @@ export class DataService {
       progressivePasses,
       finalThirdPasses: Number(m.finalThirdPasses ?? 0),
       boxEntries: Number(m.boxEntries ?? 0),
-      goals: Number(m.goals ?? 0),
+      goals: Number(m.goals ?? ourScore),
       
-      tacklesAttempted: Number(m.tacklesAttempted ?? 0),
+      tacklesAttempted: Number(m.tacklesAttempted ?? m.tackles ?? 0),
       tacklesWon,
       interceptions: Number(m.interceptions ?? 0),
       clearances: Number(m.clearances ?? 0),
       blocks: Number(m.blocks ?? 0),
       fouls: Number(m.fouls ?? 0),
-      yellowCards: Number(m.yellowCards ?? 0),
+      yellowCards: Number(m.yellowCards ?? m.yellow_cards ?? 0),
       
       ballRecoveries,
       counterAttacks: Number(m.counterAttacks ?? 0),
       turnovers: Number(m.turnovers ?? 0),
       transitionPasses: Number(m.transitionPasses ?? 0),
       
-      possessionRate: Number(m.possessionRate ?? 50),
-      longPasses: Number(m.longPasses ?? 0),
+      possessionRate: Number(m.possessionRate ?? m.possession_rate ?? 50),
+      longPasses: Number(m.longPasses ?? m.long_passes ?? 0),
       
       corners: Number(m.corners ?? 0),
       freeKicks: Number(m.freeKicks ?? 0),
@@ -156,7 +164,8 @@ export class DataService {
       tacklesSucceeded: tacklesWon,
       recoveries: ballRecoveries,
       passSuccessRate: totalPasses > 0 ? parseFloat((successfulPasses / totalPasses * 100).toFixed(1)) : 0,
-      crossSuccessRate: crossesAttempted > 0 ? parseFloat((successfulCrosses / crossesAttempted * 100).toFixed(1)) : 0
+      crossSuccessRate: crossesAttempted > 0 ? parseFloat((successfulCrosses / crossesAttempted * 100).toFixed(1)) : 0,
+      ...m
     };
   }
 

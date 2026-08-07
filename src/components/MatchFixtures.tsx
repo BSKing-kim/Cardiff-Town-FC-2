@@ -247,8 +247,29 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
   const loadFixtures = async () => {
     setIsLoading(true);
     try {
-      const list = await DataService.getFixtures();
-      setFixtures(list);
+      const [list, matchDataList] = await Promise.all([
+        DataService.getFixtures(),
+        DataService.getMatches(true)
+      ]);
+
+      const mergedList = list.map(f => {
+        const m = matchDataList.find(dbM => String(dbM.id).trim() === String(f.id).trim() || (dbM as any).match_id === String(f.id).trim());
+        if (m) {
+          const ourScore = (m as any).our_score ?? m.ourScore ?? f.ourScore;
+          const oppScore = (m as any).opponent_score ?? m.oppScore ?? f.oppScore;
+          const isCompleted = (m as any).status === 'completed' || (m as any).status === 'Finished' || (ourScore !== undefined && ourScore !== null);
+          return {
+            ...f,
+            ourScore,
+            oppScore,
+            status: isCompleted ? 'Completed' : f.status
+          };
+        }
+        return f;
+      });
+
+      setFixtures(mergedList);
+      setAllMatchData(matchDataList);
     } catch (e) {
       console.error("Error loading fixtures:", e);
     } finally {
@@ -257,20 +278,12 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
   };
 
   const loadAllInitialData = async () => {
-    setIsLoading(true);
+    await loadFixtures();
     try {
-      const [fixturesList, teamsList, matchDataList] = await Promise.all([
-        DataService.getFixtures(),
-        DataService.getCustomTeams(),
-        DataService.getMatches()
-      ]);
-      setFixtures(fixturesList);
+      const teamsList = await DataService.getCustomTeams();
       setCustomTeams(teamsList);
-      setAllMatchData(matchDataList);
     } catch (e) {
-      console.error("Error loading match fixtures data:", e);
-    } finally {
-      setIsLoading(false);
+      console.error("Error loading custom teams:", e);
     }
   };
 
@@ -438,23 +451,23 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
     const hTeam = selectedAnalysisFixture.homeTeam || "Cardiff Town FC";
     const aTeam = selectedAnalysisFixture.awayTeam || selectedAnalysisFixture.opponent;
 
-    // Filter match data of this date
+    // Match by ID first
+    const targetMatch = allMatchData.find(m => 
+      String(m.id).trim() === String(selectedAnalysisFixture.id).trim() ||
+      String(m.fixtureId).trim() === String(selectedAnalysisFixture.id).trim()
+    );
+
     const dateMatches = allMatchData.filter(m => m.date === selectedAnalysisFixture.date);
 
-    let homeData = dateMatches.find(m => m.teamName?.toLowerCase() === hTeam.toLowerCase());
+    let homeData = targetMatch || dateMatches.find(m => m.teamName?.toLowerCase() === hTeam.toLowerCase());
     let awayData = dateMatches.find(m => m.teamName?.toLowerCase() === aTeam.toLowerCase());
 
-    if (!homeData || !awayData) {
-      // Fallback to legacy structure
+    if (!homeData) {
       if (hTeam === "Cardiff Town FC") {
-        homeData = dateMatches.find(m => !m.isOpponentTeam);
+        homeData = dateMatches.find(m => !m.isOpponentTeam) || targetMatch;
         awayData = dateMatches.find(m => m.isOpponentTeam);
-      } else if (aTeam === "Cardiff Town FC") {
-        homeData = dateMatches.find(m => m.isOpponentTeam);
-        awayData = dateMatches.find(m => !m.isOpponentTeam);
       } else {
-        // Just take the first two matches on that date
-        homeData = dateMatches[0];
+        homeData = dateMatches[0] || targetMatch;
         awayData = dateMatches[1];
       }
     }
@@ -841,14 +854,25 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
               </thead>
               <tbody className="divide-y divide-[#334155]">
                 {filteredFixtures.map((f) => {
-                  const isPlayed = f.status === "Played";
+                  const isPlayed = f.status === "Played" || f.status === "Completed" || f.status === "completed" || f.ourScore !== undefined;
                   const awayTeam = f.awayTeam || (f.venue === "Away" ? "Cardiff Town FC" : f.opponent);
                   const homeTeam = f.homeTeam || (f.venue === "Home" ? "Cardiff Town FC" : f.opponent);
                   const awayScore = f.awayScore !== undefined ? f.awayScore : (f.venue === "Away" ? (f.ourScore ?? 0) : (f.oppScore ?? 0));
                   const homeScore = f.homeScore !== undefined ? f.homeScore : (f.venue === "Home" ? (f.ourScore ?? 0) : (f.oppScore ?? 0));
 
                   return (
-                    <tr key={f.id} className="hover:bg-[#0b0f19]/50 transition-colors">
+                    <tr 
+                      key={f.id} 
+                      className="hover:bg-[#0b0f19]/50 transition-colors cursor-pointer"
+                      onClick={(e) => {
+                        // Ignore click if clicking interactive buttons or inputs
+                        if ((e.target as HTMLElement).closest("button, input, a")) return;
+                        if (isPlayed) {
+                          loadAllMatchData();
+                          setSelectedAnalysisFixture(f);
+                        }
+                      }}
+                    >
                       {/* Date & Competition */}
                       <td className="py-3 px-4 font-mono">
                         <div className="font-bold text-white">{f.date}</div>
@@ -879,11 +903,17 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                       {/* Result / Status */}
                       <td className="py-3 px-4 text-center">
                         {isPlayed ? (
-                          <span className="inline-flex items-center gap-1.5 bg-[#0b0f19] border border-[#eab308]/40 px-2.5 py-1 rounded-lg font-mono font-bold text-white">
-                            <span className={awayScore > homeScore ? "text-emerald-400 font-extrabold" : "text-white"}>{awayScore}</span>
-                            <span className="text-[#94a3b8]">:</span>
-                            <span className={homeScore > awayScore ? "text-emerald-400 font-extrabold" : "text-white"}>{homeScore}</span>
-                          </span>
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="inline-flex items-center gap-1.5 bg-[#0b0f19] border border-[#eab308]/40 px-3 py-1 rounded-lg font-mono font-black text-sm text-white shadow-xs">
+                              <span className={awayScore > homeScore ? "text-emerald-400 font-extrabold" : "text-white"}>{awayScore}</span>
+                              <span className="text-[#94a3b8]">:</span>
+                              <span className={homeScore > awayScore ? "text-emerald-400 font-extrabold" : "text-white"}>{homeScore}</span>
+                            </span>
+                            <span className="inline-flex items-center gap-1 text-[9px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                              <CheckCircle className="h-2.5 w-2.5 shrink-0" />
+                              Completed
+                            </span>
+                          </div>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-[10px] text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-md font-bold uppercase">
                             <Clock className="h-3 w-3 shrink-0" />
@@ -950,11 +980,11 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                                 loadAllMatchData();
                                 setSelectedAnalysisFixture(f);
                               }}
-                              className="px-2.5 py-1 rounded-lg bg-[#0b0f19] border border-[#334155] text-[#eab308] hover:bg-[#334155] font-bold text-[11px] transition-all cursor-pointer flex items-center gap-1"
-                              title="Analyze match statistics"
+                              className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0"
+                              title="View Match Analysis Dashboard"
                             >
-                              <span>Analysis</span>
-                              <ExternalLink className="h-3 w-3 shrink-0" />
+                              <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+                              <span>View Analysis</span>
                             </button>
                           )}
 
@@ -993,7 +1023,7 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
         /* Card Grid Layout */
         <div className="grid gap-4 sm:grid-cols-2" id="fixtures-grid">
           {filteredFixtures.map((f) => {
-            const isPlayed = f.status === "Played";
+            const isPlayed = f.status === "Played" || f.status === "Completed" || f.status === "completed" || f.ourScore !== undefined;
             const awayTeam = f.awayTeam || (f.venue === "Away" ? "Cardiff Town FC" : f.opponent);
             const homeTeam = f.homeTeam || (f.venue === "Home" ? "Cardiff Town FC" : f.opponent);
             const awayScore = f.awayScore !== undefined ? f.awayScore : (f.venue === "Away" ? (f.ourScore ?? 0) : (f.oppScore ?? 0));
@@ -1002,9 +1032,16 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
             return (
               <div 
                 key={f.id} 
-                className={`rounded-2xl border p-5 shadow-lg flex flex-col justify-between bg-[#1e293b] transition-all hover:border-[#eab308]/50 relative ${
-                  isPlayed ? "border-[#334155]" : "border-[#334155]"
+                className={`rounded-2xl border p-5 shadow-lg flex flex-col justify-between bg-[#1e293b] transition-all hover:border-[#eab308]/50 relative cursor-pointer ${
+                  isPlayed ? "border-emerald-500/30" : "border-[#334155]"
                 }`}
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest("button, input, a")) return;
+                  if (isPlayed) {
+                    loadAllMatchData();
+                    setSelectedAnalysisFixture(f);
+                  }
+                }}
               >
                 {/* Header */}
                 <div className="flex items-start justify-between gap-1.5 mb-3">
@@ -1037,10 +1074,10 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
 
                     <div className="col-span-1 flex items-center justify-center text-center">
                       {isPlayed ? (
-                        <div className="flex items-center gap-1 bg-[#0b0f19] text-white px-2 py-0.5 rounded-lg border border-[#eab308]/30 font-mono font-bold text-xs">
-                          <span>{awayScore}</span>
+                        <div className="flex items-center gap-1 bg-[#0b0f19] text-white px-2.5 py-1 rounded-lg border border-emerald-500/40 font-mono font-black text-sm shadow-xs">
+                          <span className={awayScore > homeScore ? "text-emerald-400 font-extrabold" : "text-white"}>{awayScore}</span>
                           <span className="text-[#94a3b8]">:</span>
-                          <span>{homeScore}</span>
+                          <span className={homeScore > awayScore ? "text-emerald-400 font-extrabold" : "text-white"}>{homeScore}</span>
                         </div>
                       ) : (
                         <span className="text-[9px] text-[#94a3b8] font-black bg-[#0b0f19] border border-[#334155] px-2 py-0.5 rounded-md uppercase font-mono">
@@ -1077,7 +1114,7 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                     {isPlayed ? (
                       <span className="text-emerald-400 flex items-center gap-1">
                         <CheckCircle className="h-3.5 w-3.5 shrink-0" />
-                        Match Concluded
+                        Completed
                       </span>
                     ) : (
                       <span className="text-blue-400 flex items-center gap-1">
@@ -1144,10 +1181,11 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                           loadAllMatchData();
                           setSelectedAnalysisFixture(f);
                         }}
-                        className="text-[10px] font-bold text-[#eab308] hover:underline flex items-center gap-1 cursor-pointer bg-[#0b0f19] border border-[#334155] px-2.5 py-1 rounded-lg"
+                        className="flex items-center gap-1.5 py-1 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0"
+                        title="View Match Analysis Dashboard"
                       >
-                        <span>Analysis</span>
-                        <ExternalLink className="h-3 w-3 shrink-0" />
+                        <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+                        <span>View Analysis</span>
                       </button>
                     )}
 

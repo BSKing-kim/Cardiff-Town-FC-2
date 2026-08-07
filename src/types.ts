@@ -67,6 +67,11 @@ export interface MatchData {
   opponent: string;
   venue?: string; // e.g., "Home", "Away"
   result?: string; // e.g., "W (2-1)", "D (1-1)"
+  ourScore?: number;
+  oppScore?: number;
+  our_score?: number;
+  opponent_score?: number;
+  status?: string;
   isOpponentTeam: boolean; // true if it is the opponent's metrics, false if it's our team
   teamName?: string; // Team name associated with these metrics (e.g., "Cardiff Town FC" or opponent's name)
   opponent_id?: string; // ID of opponent team
