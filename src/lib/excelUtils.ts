@@ -2740,6 +2740,18 @@ export class ExcelUtils {
   }
 }
 
+const safeString = (val: any): string => {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'object' && val.result !== undefined) return String(val.result).trim();
+  return String(val).trim();
+};
+
+const safeNumber = (val: any): number => {
+  if (val === null || val === undefined) return 0;
+  const num = Number(val);
+  return isNaN(num) ? 0 : num;
+};
+
 export async function parseTeamStatsExcel(file: File): Promise<{ data: any[]; errors?: string[] }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -2752,54 +2764,54 @@ export async function parseTeamStatsExcel(file: File): Promise<{ data: any[]; er
         const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: "" }) as any[];
 
         const cleanRows = rawRows.map(row => {
-          const matchId = (ExcelUtils as any).extractString(row, ['match_id', 'Match ID', 'Game ID', 'ID']) || `TS_${Date.now()}`;
+          const matchId = safeString(row.match_id || row.id || `TEAM_STAT_${Date.now()}`);
           return {
             id: matchId,
             match_id: matchId,
-            date: (ExcelUtils as any).extractString(row, ['date', 'Date']) || new Date().toISOString().split('T')[0],
-            opponent: (ExcelUtils as any).extractString(row, ['opponent', 'Opponent']) || 'Opponent Team',
-            home_away: (ExcelUtils as any).extractString(row, ['home_away', 'Home/Away', 'homeAway']) || 'Home',
-            our_score: (ExcelUtils as any).extractInt(row, ['our_score', 'ourScore', 'our_goals', 'goals']),
-            opponent_score: (ExcelUtils as any).extractInt(row, ['opponent_score', 'opponentScore', 'opp_score', 'opp_goals']),
-            possession: (ExcelUtils as any).extractFloat(row, ['possession', 'Possession'], 50),
-            goals: (ExcelUtils as any).extractInt(row, ['goals', 'Goals']),
-            shots: (ExcelUtils as any).extractInt(row, ['shots', 'Shots']),
-            shots_on_target: (ExcelUtils as any).extractInt(row, ['shots_on_target', 'shotsOnTarget']),
-            passes: (ExcelUtils as any).extractInt(row, ['passes', 'Passes']),
-            successful_passes: (ExcelUtils as any).extractInt(row, ['successful_passes', 'successfulPasses']),
-            backwards_passes: (ExcelUtils as any).extractInt(row, ['backwards_passes', 'backwardsPasses']),
-            forwards_passes: (ExcelUtils as any).extractInt(row, ['forwards_passes', 'forwardsPasses']),
-            long_passes: (ExcelUtils as any).extractInt(row, ['long_passes', 'longPasses']),
-            successful_long_passes: (ExcelUtils as any).extractInt(row, ['successful_long_passes', 'successfulLongPasses']),
-            key_passes: (ExcelUtils as any).extractInt(row, ['key_passes', 'keyPasses']),
-            successful_key_passes: (ExcelUtils as any).extractInt(row, ['successful_key_passes', 'successfulKeyPasses']),
-            through_balls: (ExcelUtils as any).extractInt(row, ['through_balls', 'throughBalls']),
-            successful_through_balls: (ExcelUtils as any).extractInt(row, ['successful_through_balls', 'successfulThroughBalls']),
-            crosses: (ExcelUtils as any).extractInt(row, ['crosses', 'Crosses']),
-            successful_crosses: (ExcelUtils as any).extractInt(row, ['successful_crosses', 'successfulCrosses']),
-            dribbles: (ExcelUtils as any).extractInt(row, ['dribbles', 'Dribbles']),
-            successful_dribbles: (ExcelUtils as any).extractInt(row, ['successful_dribbles', 'successfulDribbles']),
-            duels: (ExcelUtils as any).extractInt(row, ['duels', 'Duels']),
-            duels_won: (ExcelUtils as any).extractInt(row, ['duels_won', 'duelsWon']),
-            aerial_duels: (ExcelUtils as any).extractInt(row, ['aerial_duels', 'aerialDuels']),
-            aerial_duels_won: (ExcelUtils as any).extractInt(row, ['aerial_duels_won', 'aerialDuelsWon']),
-            ground_duels: (ExcelUtils as any).extractInt(row, ['ground_duels', 'groundDuels']),
-            ground_duels_won: (ExcelUtils as any).extractInt(row, ['ground_duels_won', 'groundDuelsWon']),
-            ball_recoveries: (ExcelUtils as any).extractInt(row, ['ball_recoveries', 'ballRecoveries']),
-            tackles: (ExcelUtils as any).extractInt(row, ['tackles', 'Tackles']),
-            tackles_won: (ExcelUtils as any).extractInt(row, ['tackles_won', 'tacklesWon']),
-            interceptions: (ExcelUtils as any).extractInt(row, ['interceptions', 'Interceptions']),
-            clearances: (ExcelUtils as any).extractInt(row, ['clearances', 'Clearances']),
-            blocks: (ExcelUtils as any).extractInt(row, ['blocks', 'Blocks']),
-            own_goals: (ExcelUtils as any).extractInt(row, ['own_goals', 'ownGoals']),
-            turnovers: (ExcelUtils as any).extractInt(row, ['turnovers', 'Turnovers']),
-            miscontrols: (ExcelUtils as any).extractInt(row, ['miscontrols', 'Miscontrols']),
-            unsuccessful_dribbles: (ExcelUtils as any).extractInt(row, ['unsuccessful_dribbles', 'unsuccessfulDribbles']),
-            possession_lost: (ExcelUtils as any).extractInt(row, ['possession_lost', 'possessionLost']),
-            offsides: (ExcelUtils as any).extractInt(row, ['offsides', 'Offsides']),
-            fouls: (ExcelUtils as any).extractInt(row, ['fouls', 'Fouls']),
-            yellow_cards: (ExcelUtils as any).extractInt(row, ['yellow_cards', 'yellowCards']),
-            red_cards: (ExcelUtils as any).extractInt(row, ['red_cards', 'redCards'])
+            date: safeString(row.date) || new Date().toISOString().split('T')[0],
+            opponent: safeString(row.opponent) || 'Opponent Team',
+            home_away: safeString(row.home_away) || 'Home',
+            our_score: safeNumber(row.our_score ?? row.goals),
+            opponent_score: safeNumber(row.opponent_score ?? row.opp_goals),
+            possession: safeNumber(row.possession),
+            goals: safeNumber(row.goals),
+            shots: safeNumber(row.shots),
+            shots_on_target: safeNumber(row.shots_on_target),
+            passes: safeNumber(row.passes),
+            successful_passes: safeNumber(row.successful_passes),
+            backwards_passes: safeNumber(row.backwards_passes),
+            forwards_passes: safeNumber(row.forwards_passes),
+            long_passes: safeNumber(row.long_passes),
+            successful_long_passes: safeNumber(row.successful_long_passes),
+            key_passes: safeNumber(row.key_passes),
+            successful_key_passes: safeNumber(row.successful_key_passes),
+            through_balls: safeNumber(row.through_balls),
+            successful_through_balls: safeNumber(row.successful_through_balls),
+            crosses: safeNumber(row.crosses),
+            successful_crosses: safeNumber(row.successful_crosses),
+            dribbles: safeNumber(row.dribbles),
+            successful_dribbles: safeNumber(row.successful_dribbles),
+            duels: safeNumber(row.duels),
+            duels_won: safeNumber(row.duels_won),
+            aerial_duels: safeNumber(row.aerial_duels),
+            aerial_duels_won: safeNumber(row.aerial_duels_won),
+            ground_duels: safeNumber(row.ground_duels),
+            ground_duels_won: safeNumber(row.ground_duels_won),
+            ball_recoveries: safeNumber(row.ball_recoveries),
+            tackles: safeNumber(row.tackles),
+            tackles_won: safeNumber(row.tackles_won),
+            interceptions: safeNumber(row.interceptions),
+            clearances: safeNumber(row.clearances),
+            blocks: safeNumber(row.blocks),
+            own_goals: safeNumber(row.own_goals),
+            turnovers: safeNumber(row.turnovers),
+            miscontrols: safeNumber(row.miscontrols),
+            unsuccessful_dribbles: safeNumber(row.unsuccessful_dribbles),
+            possession_lost: safeNumber(row.possession_lost),
+            offsides: safeNumber(row.offsides),
+            fouls: safeNumber(row.fouls),
+            yellow_cards: safeNumber(row.yellow_cards),
+            red_cards: safeNumber(row.red_cards)
           };
         }).filter(r => r.id !== "");
 

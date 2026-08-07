@@ -4,6 +4,7 @@ import { MatchData, Player, UserProfile, CustomTeam, UserRole } from "./types";
 
 // Views
 import AuthScreen from "./components/AuthScreen";
+import MatchHub from "./components/MatchHub";
 import TeamDashboard from "./components/TeamDashboard";
 import OpponentAnalysis from "./components/OpponentAnalysis";
 import PlayerStats from "./components/PlayerStats";
@@ -515,7 +516,11 @@ export default function App() {
               <PlayerStats players={players} matches={matches} onPlayersUpdated={() => loadStatsData(true)} currentUser={currentUser} isMyPerformanceView={true} />
             )}
 
-            {(activeTab === "match-hub" || activeTab === "team") && (
+            {activeTab === "match-hub" && (
+              <MatchHub matches={matches} currentUser={currentUser} onSelectOpponent={handleSelectOpponent} />
+            )}
+
+            {activeTab === "team" && (
               <TeamDashboard matches={matches} customTeams={customTeams} currentUser={currentUser} onSelectOpponent={handleSelectOpponent} onTeamsUpdated={() => loadStatsData(true)} />
             )}
 
