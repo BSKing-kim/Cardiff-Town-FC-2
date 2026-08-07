@@ -46,24 +46,29 @@ export default function MyPerformance({ currentUser, players = [], matches = [] 
       setLoading(true);
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        
+        const targetUserId = currentUser?.id || user?.id || (currentUser as any)?.user_id;
+
         let profilePlayerId: string | null = currentUser?.playerId || (currentUser as any)?.player_id || null;
         let profileName = `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim() || currentUser?.username;
         let dbProfile: any = null;
 
         const isStaffUser = currentUser?.role !== UserRole.Player || !!currentUser?.isAdmin;
 
-        if (user) {
-          // Fetch user profile to check onboarding status & player_id
-          const { data: profile } = await (supabase.from('profiles') as any)
-            .select('*')
-            .eq('user_id', user.id)
-            .maybeSingle();
+        if (targetUserId || currentUser?.username) {
+          // Fetch latest user profile row from Supabase
+          let profileQuery = (supabase.from('profiles') as any).select('*');
+          if (targetUserId) {
+            profileQuery = profileQuery.or(`id.eq.${targetUserId},user_id.eq.${targetUserId}`);
+          } else if (currentUser?.username) {
+            profileQuery = profileQuery.eq('username', currentUser.username);
+          }
+
+          const { data: profile } = await profileQuery.maybeSingle();
 
           if (profile) {
             dbProfile = profile;
             setUserProfileData(profile);
-            
+
             if (profile.player_id) {
               profilePlayerId = profile.player_id;
             }
@@ -71,9 +76,11 @@ export default function MyPerformance({ currentUser, players = [], matches = [] 
               profileName = profile.full_name;
             }
 
-            // Check onboarding completion flag (onboarding_completed === true)
-            const isCompleted = (profile.onboarding_completed === true || profile.is_onboarded === true) && 
-                                !!profile.position && !!profile.nationality;
+            // Check onboarding modal visibility rule:
+            // IF is_onboarded === true OR onboarding_completed === true OR (position and nationality exist): DO NOT show modal
+            const isCompleted = profile.is_onboarded === true || 
+                                profile.onboarding_completed === true || 
+                                (!!profile.position && !!profile.nationality);
 
             if (!isStaffUser && !isCompleted) {
               if (isMounted) setNeedsOnboarding(true);
@@ -81,32 +88,15 @@ export default function MyPerformance({ currentUser, players = [], matches = [] 
               if (isMounted) setNeedsOnboarding(false);
             }
           } else {
-            // Check fallback by username if user_id profile is not found
-            const { data: unameProfile } = await (supabase.from('profiles') as any)
-              .select('*')
-              .eq('username', currentUser?.username)
-              .maybeSingle();
-
-            if (unameProfile) {
-              dbProfile = unameProfile;
-              setUserProfileData(unameProfile);
-
-              const isCompleted = (unameProfile.onboarding_completed === true || unameProfile.is_onboarded === true) && 
-                                  !!unameProfile.position && !!unameProfile.nationality;
-
-              if (!isStaffUser && !isCompleted) {
-                if (isMounted) setNeedsOnboarding(true);
-              } else {
-                if (isMounted) setNeedsOnboarding(false);
-              }
-            } else {
-              // New user registration without DB profile yet -> prompt onboarding for Players
-              if (!isStaffUser && isMounted) setNeedsOnboarding(true);
-            }
+            // New user registration without DB profile yet -> prompt onboarding for Players
+            if (!isStaffUser && isMounted) setNeedsOnboarding(true);
           }
         } else {
-          const isUserCompleted = ((currentUser as any)?.onboarding_completed === true || currentUser?.isOnboarded === true || currentUser?.is_onboarded === true) &&
-                                  !!currentUser?.position && !!currentUser?.nationality;
+          const isUserCompleted = (currentUser as any)?.is_onboarded === true ||
+                                  (currentUser as any)?.onboarding_completed === true ||
+                                  currentUser?.isOnboarded === true ||
+                                  currentUser?.is_onboarded === true ||
+                                  (!!currentUser?.position && !!currentUser?.nationality);
 
           if (!isStaffUser && !isUserCompleted) {
             if (isMounted) setNeedsOnboarding(true);
@@ -157,7 +147,7 @@ export default function MyPerformance({ currentUser, players = [], matches = [] 
     setIsSubmittingOnboarding(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || currentUser?.id || (currentUser as any)?.user_id;
+      const userId = currentUser?.id || user?.id || (currentUser as any)?.user_id;
       const targetUsername = currentUser?.username;
       const fullName = `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim() || currentUser?.username || "Player";
 
@@ -168,16 +158,16 @@ export default function MyPerformance({ currentUser, players = [], matches = [] 
         preferred_foot: selectedFoot,
         nationality: selectedNationality,
         squad_number: selectedSquadNumber,
+        is_onboarded: true,
         onboarding_completed: true,
-        is_onboarded: true
+        updated_at: new Date().toISOString()
       };
 
-      // 1. Send direct update to profiles table in Supabase (.eq('id', currentUser.id))
+      // 1. Submit explicit, awaited update query to profiles table in Supabase (.eq('id', currentUser.id))
       let { error: updateErr } = await (supabase.from('profiles') as any)
         .update(updatePayload)
-        .eq('id', currentUser?.id || userId);
+        .eq('id', userId);
 
-      // Fallback if update didn't match 'id'
       if (updateErr) {
         const { error: userErr } = await (supabase.from('profiles') as any)
           .update(updatePayload)
@@ -195,12 +185,17 @@ export default function MyPerformance({ currentUser, players = [], matches = [] 
               ...updatePayload,
               player_id: pId,
               full_name: fullName,
-              username: targetUsername,
-              updated_at: new Date().toISOString()
+              username: targetUsername
             };
 
-            await (supabase.from('profiles') as any)
+            const { error: upsertErr } = await (supabase.from('profiles') as any)
               .upsert(profilePayload, { onConflict: 'user_id' });
+
+            if (upsertErr) {
+              console.error("Failed to save profile setup:", upsertErr);
+              alert("Failed to save profile settings: " + (upsertErr.message || String(upsertErr)));
+              return;
+            }
           }
         }
       }
@@ -232,16 +227,19 @@ export default function MyPerformance({ currentUser, players = [], matches = [] 
         (currentUser as any).squad_number = selectedSquadNumber;
         (currentUser as any).squadNumber = selectedSquadNumber;
         (currentUser as any).onboarding_completed = true;
+        (currentUser as any).is_onboarded = true;
         currentUser.onboarding_completed = true;
         currentUser.isOnboarded = true;
         currentUser.is_onboarded = true;
+
+        localStorage.setItem("team_perf_analyzer_current_user", JSON.stringify(currentUser));
       }
 
       setAssignedPlayerId(pId);
       setNeedsOnboarding(false);
     } catch (err: any) {
-      console.warn("Failed to update onboarding info:", err);
-      alert('Failed to save settings: ' + (err?.message || String(err)));
+      console.error("Failed to save profile setup:", err);
+      alert('Failed to save profile settings: ' + (err?.message || String(err)));
     } finally {
       setIsSubmittingOnboarding(false);
     }
