@@ -55,6 +55,7 @@ export interface UserProfile {
   weight?: string | number;
   isOnboarded?: boolean;
   is_onboarded?: boolean;
+  onboarding_completed?: boolean;
 }
 
 // Represent team stats for a single match (or aggregated)

@@ -71,9 +71,15 @@ export default function MyPerformance({ currentUser, players = [], matches = [] 
               profileName = profile.full_name;
             }
 
-            // Check if user needs mandatory position/foot/nationality/squad_number onboarding (Players only)
-            if (!isStaffUser && (!profile.is_onboarded || !profile.position || !profile.preferred_foot || !profile.nationality || !profile.squad_number)) {
+            // Check onboarding completion flag (onboarding_completed === true)
+            const isCompleted = profile.onboarding_completed === true || 
+                                profile.is_onboarded === true || 
+                                (!!profile.position && !!profile.nationality);
+
+            if (!isStaffUser && !isCompleted) {
               if (isMounted) setNeedsOnboarding(true);
+            } else {
+              if (isMounted) setNeedsOnboarding(false);
             }
           } else {
             // Check fallback by username if user_id profile is not found
@@ -85,16 +91,32 @@ export default function MyPerformance({ currentUser, players = [], matches = [] 
             if (unameProfile) {
               dbProfile = unameProfile;
               setUserProfileData(unameProfile);
-              if (!isStaffUser && (!unameProfile.is_onboarded || !unameProfile.position || !unameProfile.preferred_foot || !unameProfile.nationality || !unameProfile.squad_number)) {
+
+              const isCompleted = unameProfile.onboarding_completed === true || 
+                                  unameProfile.is_onboarded === true || 
+                                  (!!unameProfile.position && !!unameProfile.nationality);
+
+              if (!isStaffUser && !isCompleted) {
                 if (isMounted) setNeedsOnboarding(true);
+              } else {
+                if (isMounted) setNeedsOnboarding(false);
               }
             } else {
               // New user registration without DB profile yet -> prompt onboarding for Players
               if (!isStaffUser && isMounted) setNeedsOnboarding(true);
             }
           }
-        } else if (!isStaffUser && (!currentUser?.position || !currentUser?.preferred_foot || !currentUser?.nationality || !(currentUser as any)?.squad_number)) {
-          if (isMounted) setNeedsOnboarding(true);
+        } else {
+          const isUserCompleted = (currentUser as any)?.onboarding_completed === true ||
+                                  currentUser?.isOnboarded === true ||
+                                  currentUser?.is_onboarded === true ||
+                                  (!!currentUser?.position && !!currentUser?.nationality);
+
+          if (!isStaffUser && !isUserCompleted) {
+            if (isMounted) setNeedsOnboarding(true);
+          } else {
+            if (isMounted) setNeedsOnboarding(false);
+          }
         }
 
         if (isMounted && profilePlayerId) {
@@ -139,48 +161,51 @@ export default function MyPerformance({ currentUser, players = [], matches = [] 
     setIsSubmittingOnboarding(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || currentUser?.id || currentUser?.user_id;
+      const userId = user?.id || currentUser?.id || (currentUser as any)?.user_id;
       const targetUsername = currentUser?.username;
       const fullName = `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim() || currentUser?.username || "Player";
 
       const pId = assignedPlayerId || userProfileData?.player_id || `PLR-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
-      // Direct Supabase update to the profiles table as specified
-      const { error: updateErr } = await (supabase.from('profiles') as any).update({
+      const updatePayload = {
         position: selectedPosition,
         preferred_foot: selectedFoot,
         nationality: selectedNationality,
         squad_number: selectedSquadNumber,
+        onboarding_completed: true,
         is_onboarded: true
-      }).eq('id', userId);
+      };
 
-      // Fallback if update didn't match an 'id' or row needed upsert
+      // 1. Send direct update to profiles table in Supabase (.eq('id', currentUser.id))
+      let { error: updateErr } = await (supabase.from('profiles') as any)
+        .update(updatePayload)
+        .eq('id', currentUser?.id || userId);
+
+      // Fallback if update didn't match 'id'
       if (updateErr) {
-        const { error: userErr } = await (supabase.from('profiles') as any).update({
-          position: selectedPosition,
-          preferred_foot: selectedFoot,
-          nationality: selectedNationality,
-          squad_number: selectedSquadNumber,
-          is_onboarded: true
-        }).eq('user_id', userId);
+        const { error: userErr } = await (supabase.from('profiles') as any)
+          .update(updatePayload)
+          .eq('user_id', userId);
 
-        if (userErr) {
-          const profilePayload: any = {
-            id: userId,
-            user_id: userId,
-            position: selectedPosition,
-            preferred_foot: selectedFoot,
-            nationality: selectedNationality,
-            squad_number: selectedSquadNumber,
-            is_onboarded: true,
-            player_id: pId,
-            full_name: fullName,
-            username: targetUsername,
-            updated_at: new Date().toISOString()
-          };
+        if (userErr && targetUsername) {
+          const { error: nameErr } = await (supabase.from('profiles') as any)
+            .update(updatePayload)
+            .eq('username', targetUsername);
 
-          await (supabase.from('profiles') as any)
-            .upsert(profilePayload, { onConflict: 'user_id' });
+          if (nameErr) {
+            const profilePayload: any = {
+              id: userId,
+              user_id: userId,
+              ...updatePayload,
+              player_id: pId,
+              full_name: fullName,
+              username: targetUsername,
+              updated_at: new Date().toISOString()
+            };
+
+            await (supabase.from('profiles') as any)
+              .upsert(profilePayload, { onConflict: 'user_id' });
+          }
         }
       }
 
@@ -199,11 +224,7 @@ export default function MyPerformance({ currentUser, players = [], matches = [] 
       // 3. Update local state immediately
       setUserProfileData((prev: any) => ({
         ...prev,
-        position: selectedPosition,
-        preferred_foot: selectedFoot,
-        nationality: selectedNationality,
-        squad_number: selectedSquadNumber,
-        is_onboarded: true,
+        ...updatePayload,
         player_id: pId
       }));
 
@@ -214,6 +235,8 @@ export default function MyPerformance({ currentUser, players = [], matches = [] 
         currentUser.nationality = selectedNationality;
         (currentUser as any).squad_number = selectedSquadNumber;
         (currentUser as any).squadNumber = selectedSquadNumber;
+        (currentUser as any).onboarding_completed = true;
+        currentUser.onboarding_completed = true;
         currentUser.isOnboarded = true;
         currentUser.is_onboarded = true;
       }

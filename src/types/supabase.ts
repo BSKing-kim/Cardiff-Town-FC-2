@@ -23,6 +23,7 @@ export interface Database {
           squad_number: string | number | null
           status: string | null
           is_onboarded: boolean | null
+          onboarding_completed: boolean | null
           created_at: string | null
         }
         Insert: {
@@ -38,6 +39,7 @@ export interface Database {
           squad_number?: string | number | null
           status?: string | null
           is_onboarded?: boolean | null
+          onboarding_completed?: boolean | null
           created_at?: string | null
         }
         Update: {
@@ -53,6 +55,7 @@ export interface Database {
           squad_number?: string | number | null
           status?: string | null
           is_onboarded?: boolean | null
+          onboarding_completed?: boolean | null
           created_at?: string | null
         }
       }
