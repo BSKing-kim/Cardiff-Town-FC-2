@@ -911,6 +911,23 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                                    (rawOppScore !== undefined && rawOppScore !== null);
                   const isPlayed = f.status === "Played" || f.status === "Completed" || f.status === "completed" || hasScore;
 
+                  const matchDataRecord = allMatchData.find(m => 
+                    String(m.id).trim() === String(f.id).trim() ||
+                    String((m as any).fixtureId).trim() === String(f.id).trim()
+                  ) || (f as any);
+
+                  const isAnalysisAvailable = Boolean(
+                    (matchDataRecord && (
+                      matchDataRecord.status === 'completed' || 
+                      matchDataRecord.status === 'Completed' || 
+                      (matchDataRecord as any).our_score !== undefined || 
+                      (matchDataRecord as any).goals !== undefined ||
+                      (matchDataRecord as any).shots !== undefined
+                    )) ||
+                    isPlayed ||
+                    hasScore
+                  );
+
                   const displayOurScore = rawOurScore ?? 0;
                   const displayOppScore = rawOppScore ?? 0;
                   const homeScore = isCardiffHome ? displayOurScore : displayOppScore;
@@ -923,7 +940,7 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                       onClick={(e) => {
                         // Ignore click if clicking interactive buttons or inputs
                         if ((e.target as HTMLElement).closest("button, input, a")) return;
-                        if (isPlayed) {
+                        if (isAnalysisAvailable) {
                           loadAllMatchData();
                           setSelectedAnalysisFixture(f);
                         }
@@ -1028,7 +1045,7 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                           )}
 
                           {/* Analysis Button for Concluded Matches */}
-                          {isPlayed && (
+                          {isAnalysisAvailable && (
                             <button
                               onClick={() => {
                                 loadAllMatchData();
@@ -1087,6 +1104,23 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                              (rawOppScore !== undefined && rawOppScore !== null);
             const isPlayed = f.status === "Played" || f.status === "Completed" || f.status === "completed" || hasScore;
 
+            const matchDataRecord = allMatchData.find(m => 
+              String(m.id).trim() === String(f.id).trim() ||
+              String((m as any).fixtureId).trim() === String(f.id).trim()
+            ) || (f as any);
+
+            const isAnalysisAvailable = Boolean(
+              (matchDataRecord && (
+                matchDataRecord.status === 'completed' || 
+                matchDataRecord.status === 'Completed' || 
+                (matchDataRecord as any).our_score !== undefined || 
+                (matchDataRecord as any).goals !== undefined ||
+                (matchDataRecord as any).shots !== undefined
+              )) ||
+              isPlayed ||
+              hasScore
+            );
+
             const displayOurScore = rawOurScore ?? 0;
             const displayOppScore = rawOppScore ?? 0;
             const homeScore = isCardiffHome ? displayOurScore : displayOppScore;
@@ -1096,11 +1130,11 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
               <div 
                 key={f.id} 
                 className={`rounded-2xl border p-5 shadow-lg flex flex-col justify-between bg-[#1e293b] transition-all hover:border-[#eab308]/50 relative cursor-pointer ${
-                  isPlayed ? "border-emerald-500/30" : "border-[#334155]"
+                  isAnalysisAvailable ? "border-emerald-500/30" : "border-[#334155]"
                 }`}
                 onClick={(e) => {
                   if ((e.target as HTMLElement).closest("button, input, a")) return;
-                  if (isPlayed) {
+                  if (isAnalysisAvailable) {
                     loadAllMatchData();
                     setSelectedAnalysisFixture(f);
                   }
@@ -1236,7 +1270,7 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                       </button>
                     )}
 
-                    {isPlayed && (
+                    {isAnalysisAvailable && (
                       <button
                         onClick={() => {
                           loadAllMatchData();
