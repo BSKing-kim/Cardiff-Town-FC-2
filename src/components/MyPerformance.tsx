@@ -72,9 +72,8 @@ export default function MyPerformance({ currentUser, players = [], matches = [] 
             }
 
             // Check onboarding completion flag (onboarding_completed === true)
-            const isCompleted = profile.onboarding_completed === true || 
-                                profile.is_onboarded === true || 
-                                (!!profile.position && !!profile.nationality);
+            const isCompleted = (profile.onboarding_completed === true || profile.is_onboarded === true) && 
+                                !!profile.position && !!profile.nationality;
 
             if (!isStaffUser && !isCompleted) {
               if (isMounted) setNeedsOnboarding(true);
@@ -92,9 +91,8 @@ export default function MyPerformance({ currentUser, players = [], matches = [] 
               dbProfile = unameProfile;
               setUserProfileData(unameProfile);
 
-              const isCompleted = unameProfile.onboarding_completed === true || 
-                                  unameProfile.is_onboarded === true || 
-                                  (!!unameProfile.position && !!unameProfile.nationality);
+              const isCompleted = (unameProfile.onboarding_completed === true || unameProfile.is_onboarded === true) && 
+                                  !!unameProfile.position && !!unameProfile.nationality;
 
               if (!isStaffUser && !isCompleted) {
                 if (isMounted) setNeedsOnboarding(true);
@@ -107,10 +105,8 @@ export default function MyPerformance({ currentUser, players = [], matches = [] 
             }
           }
         } else {
-          const isUserCompleted = (currentUser as any)?.onboarding_completed === true ||
-                                  currentUser?.isOnboarded === true ||
-                                  currentUser?.is_onboarded === true ||
-                                  (!!currentUser?.position && !!currentUser?.nationality);
+          const isUserCompleted = ((currentUser as any)?.onboarding_completed === true || currentUser?.isOnboarded === true || currentUser?.is_onboarded === true) &&
+                                  !!currentUser?.position && !!currentUser?.nationality;
 
           if (!isStaffUser && !isUserCompleted) {
             if (isMounted) setNeedsOnboarding(true);

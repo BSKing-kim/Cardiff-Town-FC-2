@@ -1850,7 +1850,7 @@ export class DataService {
     const userId = authUser?.id || "user_" + Math.random().toString(36).substr(2, 9);
     const playerId = `PLR-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
-    // 2. Immediately upsert their profile information into Supabase profiles table with status = 'pending'
+    // 2. Immediately upsert their profile information into Supabase profiles table with status = 'pending' and onboarding_completed = false
     try {
       const profileData = {
         id: userId,
@@ -1859,9 +1859,12 @@ export class DataService {
         full_name: fullName,
         username: username,
         role: role || 'Player',
-        position: 'CM',
+        position: null,
         preferred_foot: 'Right',
+        nationality: null,
+        squad_number: null,
         is_onboarded: false,
+        onboarding_completed: false,
         status: 'pending'
       };
       const { error } = await (supabase.from('profiles') as any).upsert(profileData, { onConflict: 'user_id' });
@@ -1900,7 +1903,10 @@ export class DataService {
       middleName,
       lastName,
       approved: false,
-      status: 'pending'
+      status: 'pending',
+      onboarding_completed: false,
+      is_onboarded: false,
+      isOnboarded: false
     };
 
     users.push(newUser);
