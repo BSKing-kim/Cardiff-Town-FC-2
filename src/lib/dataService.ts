@@ -1701,10 +1701,10 @@ export class DataService {
       throw new Error("Please enter a username.");
     }
 
-    // Standardized internal auth email
+    // Standardized internal auth email using @example.com
     const internalAuthEmail = cleanUsername.includes('@') 
       ? cleanUsername 
-      : `${cleanUsername}@cardifftownfc.com`;
+      : `${cleanUsername}@example.com`;
 
     // 1. Master Admin bypass
     if (cleanUsername === DEFAULT_ADMIN.username.toLowerCase() && passwordPlain === DEFAULT_ADMIN.passwordHash) {
@@ -1773,19 +1773,22 @@ export class DataService {
       console.warn("Supabase Auth signInWithPassword exception:", e);
     }
 
-    // Fallback try legacy domain (@ctfc.club) if internalAuthEmail failed
+    // Fallback try legacy domains (@cardifftownfc.com / @ctfc.club) if internalAuthEmail failed
     if (!authUser && !cleanUsername.includes('@')) {
-      try {
-        const legacyEmail = `${cleanUsername}@ctfc.club`;
-        const { data: legAuthData, error: legErr } = await supabase.auth.signInWithPassword({
-          email: legacyEmail,
-          password: passwordPlain
-        });
-        if (!legErr && legAuthData?.user) {
-          authUser = legAuthData.user;
-          authErr = null;
-        }
-      } catch {}
+      const legacyDomains = [`${cleanUsername}@cardifftownfc.com`, `${cleanUsername}@ctfc.club`];
+      for (const legEmail of legacyDomains) {
+        try {
+          const { data: legAuthData, error: legErr } = await supabase.auth.signInWithPassword({
+            email: legEmail,
+            password: passwordPlain
+          });
+          if (!legErr && legAuthData?.user) {
+            authUser = legAuthData.user;
+            authErr = null;
+            break;
+          }
+        } catch {}
+      }
     }
 
     // 6. If profile was not found by username but authUser exists, fetch profile by authUser.id
@@ -1914,12 +1917,12 @@ export class DataService {
 
     const fullName = `${firstName} ${lastName}`.trim();
     
-    // 1. Construct standardized internal email string
+    // 1. Standardized internal auth email using RFC test domain @example.com
     const internalAuthEmail = cleanUsername.includes('@') 
       ? cleanUsername 
-      : `${cleanUsername}@cardifftownfc.com`;
+      : `${cleanUsername}@example.com`;
 
-    // Pass internalAuthEmail to supabase.auth.signUp()
+    // 2. Sign up with Supabase Auth
     let authUser: { id: string } | null = null;
     try {
       const { data: authData, error: authErr } = await supabase.auth.signUp({
@@ -1929,71 +1932,46 @@ export class DataService {
           data: {
             username: cleanUsername,
             full_name: fullName,
-            role: role || 'Player',
-            position: 'CM'
+            role: role || 'Player'
           }
         }
       });
       if (authData?.user) {
         authUser = { id: authData.user.id };
       } else if (authErr) {
-        console.warn("Supabase auth.signUp error:", authErr);
+        console.warn("Supabase auth.signUp error:", authErr.message);
       }
     } catch (e) {
       console.warn("Supabase auth.signUp exception:", e);
     }
 
     const userId = authUser?.id || "user_" + Math.random().toString(36).substr(2, 9);
-    const playerId = `PLR-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
-    // 2. Save username, full_name, role, and status: 'pending' in public.profiles
+    // 3. Save profile strictly in public.profiles table ONLY
     try {
       const profilePayload = {
         id: userId,
         user_id: userId,
-        player_id: playerId,
         full_name: fullName,
         username: cleanUsername,
-        role: role || 'Player',
-        position: null,
-        preferred_foot: 'Right',
-        nationality: null,
-        squad_number: null,
+        role: (role || UserRole.Player) as UserRole,
+        status: 'pending',
         is_onboarded: false,
         onboarding_completed: false,
-        status: 'pending',
         created_at: new Date().toISOString()
       };
 
-      const { error: idErr } = await (supabase.from('profiles') as any).upsert([profilePayload], { onConflict: 'id' });
-      if (idErr) {
-        const { error: userErr } = await (supabase.from('profiles') as any).upsert([profilePayload], { onConflict: 'user_id' });
-        if (userErr) {
-          await (supabase.from('profiles') as any).upsert([profilePayload], { onConflict: 'username' });
-        }
+      const { error: profileError } = await (supabase.from('profiles') as any).upsert([profilePayload], { onConflict: 'id' });
+      if (profileError) {
+        console.warn("Profiles upsert warning:", profileError.message);
       }
-
-      // 3. Create player entry in players table
-      const playerRecord = {
-        id: playerId,
-        name: fullName,
-        position: 'CM',
-        preferred_foot: 'Right',
-        nationality: 'Wales',
-        division: 'CCFL First',
-        team_name: 'Cardiff Town FC',
-        created_at: new Date().toISOString()
-      };
-      await (supabase.from('players') as any).upsert(playerRecord, { onConflict: 'id' });
     } catch (err) {
-      console.warn("Exception upserting profile/player in Supabase during registration:", err);
+      console.warn("Exception saving profile in Supabase:", err);
     }
 
     const newUser = {
       id: userId,
       user_id: userId,
-      player_id: playerId,
-      playerId: playerId,
       username: cleanUsername,
       role: (role || UserRole.Player) as UserRole,
       isAdmin: (role as string) === "Admin" || role === UserRole.HeadCoach || role === UserRole.Manager,
