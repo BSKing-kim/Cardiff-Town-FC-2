@@ -4,7 +4,7 @@ import { DataService } from "../lib/dataService";
 import { ExcelUtils } from "../lib/excelUtils";
 import { MatchHeatmap } from "./MatchHeatmap";
 import { 
-  Calendar, MapPin, Trophy, ShieldAlert, Plus, Trash2, Clock, CheckCircle, ExternalLink, Filter, Upload, Printer, X, TrendingUp, Download, Minus, Table, LayoutGrid, Edit3
+  Calendar, MapPin, Trophy, ShieldAlert, Plus, Trash2, Clock, CheckCircle, ExternalLink, Filter, Upload, Printer, X, TrendingUp, Download, Minus, Table, LayoutGrid, Edit3, PieChart
 } from "lucide-react";
 import TeamLogo from "./TeamLogo";
 import { LEAGUES } from "./TeamDashboard";
@@ -422,14 +422,43 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
         ...targetMatch,
         goals: ourGoals,
         possessionRate: Number(ourPoss),
-        shots: targetMatch.shots ?? 0,
-        shotsOnTarget: targetMatch.shotsOnTarget ?? targetMatch.shots_on_target ?? 0,
-        totalPasses: targetMatch.totalPasses ?? targetMatch.passes ?? 0,
-        successfulPasses: targetMatch.successfulPasses ?? targetMatch.successful_passes ?? 0,
-        tacklesAttempted: targetMatch.tacklesAttempted ?? targetMatch.tackles ?? 0,
-        tacklesWon: targetMatch.tacklesWon ?? targetMatch.tackles_won ?? 0,
-        interceptions: targetMatch.interceptions ?? 0,
-        clearances: targetMatch.clearances ?? 0
+        shots: targetMatch.shots ?? (targetMatch as any).shots ?? 0,
+        shotsOnTarget: targetMatch.shotsOnTarget ?? (targetMatch as any).shots_on_target ?? 0,
+        totalPasses: targetMatch.totalPasses ?? (targetMatch as any).passes ?? 0,
+        successfulPasses: targetMatch.successfulPasses ?? (targetMatch as any).successful_passes ?? 0,
+        backwardsPasses: (targetMatch as any).backwards_passes ?? 0,
+        forwardsPasses: (targetMatch as any).forwards_passes ?? 0,
+        longPasses: (targetMatch as any).long_passes ?? 0,
+        successfulLongPasses: (targetMatch as any).successful_long_passes ?? 0,
+        keyPasses: (targetMatch as any).key_passes ?? 0,
+        successfulKeyPasses: (targetMatch as any).successful_key_passes ?? 0,
+        throughBalls: (targetMatch as any).through_balls ?? 0,
+        successfulThroughBalls: (targetMatch as any).successful_through_balls ?? 0,
+        crosses: (targetMatch as any).crosses ?? 0,
+        successfulCrosses: (targetMatch as any).successful_crosses ?? 0,
+        dribbles: (targetMatch as any).dribbles ?? 0,
+        successfulDribbles: (targetMatch as any).successful_dribbles ?? 0,
+        duels: (targetMatch as any).duels ?? 0,
+        duelsWon: (targetMatch as any).duels_won ?? 0,
+        aerialDuels: (targetMatch as any).aerial_duels ?? 0,
+        aerialDuelsWon: (targetMatch as any).aerial_duels_won ?? 0,
+        groundDuels: (targetMatch as any).ground_duels ?? 0,
+        groundDuelsWon: (targetMatch as any).ground_duels_won ?? 0,
+        ballRecoveries: (targetMatch as any).ball_recoveries ?? 0,
+        tacklesAttempted: targetMatch.tacklesAttempted ?? (targetMatch as any).tackles ?? 0,
+        tacklesWon: targetMatch.tacklesWon ?? (targetMatch as any).tackles_won ?? 0,
+        interceptions: targetMatch.interceptions ?? (targetMatch as any).interceptions ?? 0,
+        clearances: targetMatch.clearances ?? (targetMatch as any).clearances ?? 0,
+        blocks: (targetMatch as any).blocks ?? 0,
+        ownGoals: (targetMatch as any).own_goals ?? 0,
+        turnovers: (targetMatch as any).turnovers ?? 0,
+        miscontrols: (targetMatch as any).miscontrols ?? 0,
+        unsuccessfulDribbles: (targetMatch as any).unsuccessful_dribbles ?? 0,
+        possessionLost: (targetMatch as any).possession_lost ?? 0,
+        offsides: (targetMatch as any).offsides ?? 0,
+        fouls: (targetMatch as any).fouls ?? 0,
+        yellowCards: (targetMatch as any).yellow_cards ?? 0,
+        redCards: (targetMatch as any).red_cards ?? 0,
       };
 
       const oppPackage = {
@@ -443,10 +472,39 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
         shotsOnTarget: (targetMatch as any).opp_shots_on_target ?? 0,
         totalPasses: (targetMatch as any).opp_passes ?? 0,
         successfulPasses: (targetMatch as any).opp_successful_passes ?? 0,
+        backwardsPasses: (targetMatch as any).opp_backwards_passes ?? 0,
+        forwardsPasses: (targetMatch as any).opp_forwards_passes ?? 0,
+        longPasses: (targetMatch as any).opp_long_passes ?? 0,
+        successfulLongPasses: (targetMatch as any).opp_successful_long_passes ?? 0,
+        keyPasses: (targetMatch as any).opp_key_passes ?? 0,
+        successfulKeyPasses: (targetMatch as any).opp_successful_key_passes ?? 0,
+        throughBalls: (targetMatch as any).opp_through_balls ?? 0,
+        successfulThroughBalls: (targetMatch as any).opp_successful_through_balls ?? 0,
+        crosses: (targetMatch as any).opp_crosses ?? 0,
+        successfulCrosses: (targetMatch as any).opp_successful_crosses ?? 0,
+        dribbles: (targetMatch as any).opp_dribbles ?? 0,
+        successfulDribbles: (targetMatch as any).opp_successful_dribbles ?? 0,
+        duels: (targetMatch as any).opp_duels ?? 0,
+        duelsWon: (targetMatch as any).opp_duels_won ?? 0,
+        aerialDuels: (targetMatch as any).opp_aerial_duels ?? 0,
+        aerialDuelsWon: (targetMatch as any).opp_aerial_duels_won ?? 0,
+        groundDuels: (targetMatch as any).opp_ground_duels ?? 0,
+        groundDuelsWon: (targetMatch as any).opp_ground_duels_won ?? 0,
+        ballRecoveries: (targetMatch as any).opp_ball_recoveries ?? 0,
         tacklesAttempted: (targetMatch as any).opp_tackles ?? 0,
         tacklesWon: (targetMatch as any).opp_tackles_won ?? 0,
         interceptions: (targetMatch as any).opp_interceptions ?? 0,
-        clearances: (targetMatch as any).opp_clearances ?? 0
+        clearances: (targetMatch as any).opp_clearances ?? 0,
+        blocks: (targetMatch as any).opp_blocks ?? 0,
+        ownGoals: (targetMatch as any).opp_own_goals ?? 0,
+        turnovers: (targetMatch as any).opp_turnovers ?? 0,
+        miscontrols: (targetMatch as any).opp_miscontrols ?? 0,
+        unsuccessfulDribbles: (targetMatch as any).opp_unsuccessful_dribbles ?? 0,
+        possessionLost: (targetMatch as any).opp_possession_lost ?? 0,
+        offsides: (targetMatch as any).opp_offsides ?? 0,
+        fouls: (targetMatch as any).opp_fouls ?? 0,
+        yellowCards: (targetMatch as any).opp_yellow_cards ?? 0,
+        redCards: (targetMatch as any).opp_red_cards ?? 0,
       };
 
       if (isCardiffHome) {
@@ -1332,7 +1390,7 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                 </button>
               </div>
 
-              {/* Modal Body / Categories */}
+              {/* Modal Body */}
               <div className="p-6 overflow-y-auto space-y-6">
                 {activeAnalysisTab === "heatmap" ? (
                   <MatchHeatmap matchId={selectedAnalysisFixture.id} homeTeam={hTeam} awayTeam={aTeam} />
@@ -1341,57 +1399,180 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                     <div className="text-center py-10 text-slate-500 font-medium text-xs">
                       No detailed metric records were found for this match.
                     </div>
-                  ) : (
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      {categories.map((cat) => (
-                        <div key={cat.title} className="bg-slate-50 border border-slate-100 p-4 rounded-xl space-y-3 shadow-3xs">
-                          <h4 className="text-xs font-bold text-[#0A2342] uppercase tracking-wider border-b border-slate-200 pb-1.5 flex items-center justify-between">
-                            <span>{cat.title} Comparison</span>
+                  ) : (() => {
+                    const calcPct = (num: number, den: number) => (den > 0 ? Number(((num / den) * 100).toFixed(1)) : 0);
+
+                    const percentageMetrics = [
+                      {
+                        title: "Shot Accuracy",
+                        homePct: calcPct(analysisData?.homeData?.shotsOnTarget || 0, analysisData?.homeData?.shots || 0),
+                        awayPct: calcPct(analysisData?.awayData?.shotsOnTarget || 0, analysisData?.awayData?.shots || 0),
+                      },
+                      {
+                        title: "Pass Accuracy",
+                        homePct: calcPct(analysisData?.homeData?.successfulPasses || 0, analysisData?.homeData?.totalPasses || 0),
+                        awayPct: calcPct(analysisData?.awayData?.successfulPasses || 0, analysisData?.awayData?.totalPasses || 0),
+                      },
+                      {
+                        title: "Duel Won %",
+                        homePct: calcPct(analysisData?.homeData?.duelsWon || 0, analysisData?.homeData?.duels || 0),
+                        awayPct: calcPct(analysisData?.awayData?.duelsWon || 0, analysisData?.awayData?.duels || 0),
+                      },
+                      {
+                        title: "Tackle Won %",
+                        homePct: calcPct(analysisData?.homeData?.tacklesWon || 0, analysisData?.homeData?.tacklesAttempted || 0),
+                        awayPct: calcPct(analysisData?.awayData?.tacklesWon || 0, analysisData?.awayData?.tacklesAttempted || 0),
+                      },
+                      {
+                        title: "Long Pass Suc %",
+                        homePct: calcPct(analysisData?.homeData?.successfulLongPasses || 0, analysisData?.homeData?.longPasses || 0),
+                        awayPct: calcPct(analysisData?.awayData?.successfulLongPasses || 0, analysisData?.awayData?.longPasses || 0),
+                      },
+                      {
+                        title: "Key Pass Suc %",
+                        homePct: calcPct(analysisData?.homeData?.successfulKeyPasses || 0, analysisData?.homeData?.keyPasses || 0),
+                        awayPct: calcPct(analysisData?.awayData?.successfulKeyPasses || 0, analysisData?.awayData?.keyPasses || 0),
+                      },
+                      {
+                        title: "Through Ball Suc %",
+                        homePct: calcPct(analysisData?.homeData?.successfulThroughBalls || 0, analysisData?.homeData?.throughBalls || 0),
+                        awayPct: calcPct(analysisData?.awayData?.successfulThroughBalls || 0, analysisData?.awayData?.throughBalls || 0),
+                      },
+                      {
+                        title: "Cross Suc %",
+                        homePct: calcPct(analysisData?.homeData?.successfulCrosses || 0, analysisData?.homeData?.crosses || 0),
+                        awayPct: calcPct(analysisData?.awayData?.successfulCrosses || 0, analysisData?.awayData?.crosses || 0),
+                      },
+                      {
+                        title: "Dribble Suc %",
+                        homePct: calcPct(analysisData?.homeData?.successfulDribbles || 0, analysisData?.homeData?.dribbles || 0),
+                        awayPct: calcPct(analysisData?.awayData?.successfulDribbles || 0, analysisData?.awayData?.dribbles || 0),
+                      },
+                    ];
+
+                    const detailedMetricList = [
+                      { label: "Possession", homeVal: `${Number(analysisData?.homeData?.possessionRate ?? 50).toFixed(1)}%`, awayVal: `${Number(analysisData?.awayData?.possessionRate ?? 50).toFixed(1)}%` },
+                      { label: "Goals", homeVal: analysisData?.homeData?.goals ?? 0, awayVal: analysisData?.awayData?.goals ?? 0 },
+                      { label: "Shot", homeVal: analysisData?.homeData?.shots ?? 0, awayVal: analysisData?.awayData?.shots ?? 0 },
+                      { label: "SOT", homeVal: analysisData?.homeData?.shotsOnTarget ?? 0, awayVal: analysisData?.awayData?.shotsOnTarget ?? 0 },
+                      { label: "Passes", homeVal: analysisData?.homeData?.totalPasses ?? 0, awayVal: analysisData?.awayData?.totalPasses ?? 0 },
+                      { label: "Backwards", homeVal: analysisData?.homeData?.backwardsPasses ?? 0, awayVal: analysisData?.awayData?.backwardsPasses ?? 0 },
+                      { label: "Forwards", homeVal: analysisData?.homeData?.forwardsPasses ?? 0, awayVal: analysisData?.awayData?.forwardsPasses ?? 0 },
+                      { label: "Long Passes", homeVal: analysisData?.homeData?.longPasses ?? 0, awayVal: analysisData?.awayData?.longPasses ?? 0 },
+                      { label: "Key Passes", homeVal: analysisData?.homeData?.keyPasses ?? 0, awayVal: analysisData?.awayData?.keyPasses ?? 0 },
+                      { label: "Through Balls", homeVal: analysisData?.homeData?.throughBalls ?? 0, awayVal: analysisData?.awayData?.throughBalls ?? 0 },
+                      { label: "Crosses", homeVal: analysisData?.homeData?.crosses ?? 0, awayVal: analysisData?.awayData?.crosses ?? 0 },
+                      { label: "Dribbles", homeVal: analysisData?.homeData?.dribbles ?? 0, awayVal: analysisData?.awayData?.dribbles ?? 0 },
+                      { label: "Duels", homeVal: analysisData?.homeData?.duels ?? 0, awayVal: analysisData?.awayData?.duels ?? 0 },
+                      { label: "Duel Wons", homeVal: analysisData?.homeData?.duelsWon ?? 0, awayVal: analysisData?.awayData?.duelsWon ?? 0 },
+                      { label: "Aerial Duels", homeVal: analysisData?.homeData?.aerialDuels ?? 0, awayVal: analysisData?.awayData?.aerialDuels ?? 0 },
+                      { label: "Aerial Duel Wons", homeVal: analysisData?.homeData?.aerialDuelsWon ?? 0, awayVal: analysisData?.awayData?.aerialDuelsWon ?? 0 },
+                      { label: "Ground Duels", homeVal: analysisData?.homeData?.groundDuels ?? 0, awayVal: analysisData?.awayData?.groundDuels ?? 0 },
+                      { label: "Ground Duel Wons", homeVal: analysisData?.homeData?.groundDuelsWon ?? 0, awayVal: analysisData?.awayData?.groundDuelsWon ?? 0 },
+                      { label: "Ball Recovery", homeVal: analysisData?.homeData?.ballRecoveries ?? 0, awayVal: analysisData?.awayData?.ballRecoveries ?? 0 },
+                      { label: "Tackles", homeVal: analysisData?.homeData?.tacklesAttempted ?? 0, awayVal: analysisData?.awayData?.tacklesAttempted ?? 0 },
+                      { label: "Tackle Wons", homeVal: analysisData?.homeData?.tacklesWon ?? 0, awayVal: analysisData?.awayData?.tacklesWon ?? 0 },
+                      { label: "Interceptions", homeVal: analysisData?.homeData?.interceptions ?? 0, awayVal: analysisData?.awayData?.interceptions ?? 0 },
+                      { label: "Clearance", homeVal: analysisData?.homeData?.clearances ?? 0, awayVal: analysisData?.awayData?.clearances ?? 0 },
+                      { label: "Blocked", homeVal: analysisData?.homeData?.blocks ?? 0, awayVal: analysisData?.awayData?.blocks ?? 0 },
+                      { label: "Own Goals", homeVal: analysisData?.homeData?.ownGoals ?? 0, awayVal: analysisData?.awayData?.ownGoals ?? 0 },
+                      { label: "Turnovers", homeVal: analysisData?.homeData?.turnovers ?? 0, awayVal: analysisData?.awayData?.turnovers ?? 0 },
+                      { label: "Miscontrol", homeVal: analysisData?.homeData?.miscontrols ?? 0, awayVal: analysisData?.awayData?.miscontrols ?? 0 },
+                      { label: "Uns Dribble", homeVal: analysisData?.homeData?.unsuccessfulDribbles ?? 0, awayVal: analysisData?.awayData?.unsuccessfulDribbles ?? 0 },
+                      { label: "Possession Lost", homeVal: analysisData?.homeData?.possessionLost ?? 0, awayVal: analysisData?.awayData?.possessionLost ?? 0 },
+                      { label: "Offside", homeVal: analysisData?.homeData?.offsides ?? 0, awayVal: analysisData?.awayData?.offsides ?? 0 },
+                      { label: "Fouls", homeVal: analysisData?.homeData?.fouls ?? 0, awayVal: analysisData?.awayData?.fouls ?? 0 },
+                      { label: "Yellow Card", homeVal: analysisData?.homeData?.yellowCards ?? 0, awayVal: analysisData?.awayData?.yellowCards ?? 0 },
+                      { label: "Red Card", homeVal: analysisData?.homeData?.redCards ?? 0, awayVal: analysisData?.awayData?.redCards ?? 0 },
+                    ];
+
+                    return (
+                      <div className="space-y-6">
+                        {/* Middle Section: Donut Graphs for 9 Percentage (%) Metrics */}
+                        <div className="space-y-3">
+                          <h4 className="text-xs font-bold text-[#0A2342] uppercase tracking-wider font-display flex items-center gap-2">
+                            <PieChart className="h-4 w-4 text-[#1D4ED8]" />
+                            <span>Efficiency & Success Donut Charts</span>
                           </h4>
-                          <div className="space-y-4">
-                            {cat.metrics.map((m) => {
-                              const total = m.homeVal + m.awayVal;
-                              const homePct = total > 0 ? (m.homeVal / total) * 100 : 50;
-                              const awayPct = total > 0 ? (m.awayVal / total) * 100 : 50;
-
-                              const isHomeHigher = m.homeVal > m.awayVal;
-                              const isAwayHigher = m.awayVal > m.homeVal;
-
-                              const homeColor = isHomeHigher ? "bg-[#1D4ED8]" : "bg-slate-300";
-                              const awayColor = isAwayHigher ? "bg-[#1D4ED8]" : "bg-slate-300";
-
-                              const homeTextColor = isHomeHigher ? "text-[#1D4ED8] font-black" : "text-slate-600 font-semibold";
-                              const awayTextColor = isAwayHigher ? "text-[#1D4ED8] font-black" : "text-slate-600 font-semibold";
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            {percentageMetrics.map((pm) => {
+                              const radius = 28;
+                              const stroke = 5;
+                              const normalizedRadius = radius - stroke * 0.5;
+                              const circumference = normalizedRadius * 2 * Math.PI;
+                              const homeStrokeDashoffset = circumference - (pm.homePct / 100) * circumference;
 
                               return (
-                                <div key={m.label} className="space-y-1">
-                                  <div className="flex items-center justify-between text-[11px] font-sans">
-                                    <span className={homeTextColor}>{m.homeVal}</span>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{m.label}</span>
-                                    <span className={awayTextColor}>{m.awayVal}</span>
+                                <div key={pm.title} className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex flex-col items-center justify-between text-center shadow-2xs">
+                                  <span className="text-[10px] font-extrabold text-[#0A2342] uppercase tracking-wider mb-1 font-display truncate w-full" title={pm.title}>
+                                    {pm.title}
+                                  </span>
+                                  <div className="relative flex items-center justify-center my-1">
+                                    <svg height={radius * 2} width={radius * 2} className="transform -rotate-90">
+                                      <circle
+                                        stroke="#e2e8f0"
+                                        fill="transparent"
+                                        strokeWidth={stroke}
+                                        r={normalizedRadius}
+                                        cx={radius}
+                                        cy={radius}
+                                      />
+                                      <circle
+                                        stroke="#1D4ED8"
+                                        fill="transparent"
+                                        strokeWidth={stroke}
+                                        strokeDasharray={`${circumference} ${circumference}`}
+                                        style={{ strokeDashoffset: homeStrokeDashoffset }}
+                                        strokeLinecap="round"
+                                        r={normalizedRadius}
+                                        cx={radius}
+                                        cy={radius}
+                                        className="transition-all duration-500"
+                                      />
+                                    </svg>
+                                    <div className="absolute flex flex-col items-center justify-center font-mono">
+                                      <span className="text-[11px] font-black text-[#1D4ED8]">{pm.homePct.toFixed(0)}%</span>
+                                    </div>
                                   </div>
-                                  <div className="flex h-1.5 w-full items-center gap-1 overflow-hidden rounded-full bg-slate-100">
-                                    <div className="w-1/2 flex justify-end">
-                                      <div 
-                                        className={`h-full rounded-l-full ${homeColor} transition-all duration-500`}
-                                        style={{ width: `${homePct}%` }}
-                                      />
-                                    </div>
-                                    <div className="w-1/2 flex justify-start">
-                                      <div 
-                                        className={`h-full rounded-r-full ${awayColor} transition-all duration-500`}
-                                        style={{ width: `${awayPct}%` }}
-                                      />
-                                    </div>
+                                  <div className="flex items-center justify-between w-full text-[9px] font-bold mt-1.5 pt-1.5 border-t border-slate-200/60 font-sans">
+                                    <span className="text-[#1D4ED8]">H: {pm.homePct.toFixed(1)}%</span>
+                                    <span className="text-emerald-600">A: {pm.awayPct.toFixed(1)}%</span>
                                   </div>
                                 </div>
                               );
                             })}
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )
+
+                        {/* Bottom Section: Center-Labeled Detailed Metric List */}
+                        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-2 shadow-sm">
+                          <div className="text-xs font-extrabold text-[#0A2342] uppercase tracking-wider border-b border-slate-200 pb-2 mb-3 font-display flex items-center justify-between">
+                            <span className="text-[#1D4ED8] font-bold">{hTeam} (Home)</span>
+                            <span className="text-slate-400 font-mono text-[10px]">DETAILED METRIC LIST</span>
+                            <span className="text-emerald-600 font-bold">{aTeam} (Away)</span>
+                          </div>
+                          <div className="divide-y divide-slate-200/60">
+                            {detailedMetricList.map((m) => (
+                              <div key={m.label} className="grid grid-cols-3 items-center py-2 text-xs font-sans hover:bg-slate-100/60 px-2 rounded-lg transition-colors">
+                                {/* Left Column: Home Team Data */}
+                                <div className="text-left font-bold text-[#1D4ED8]">
+                                  {m.homeVal}
+                                </div>
+                                {/* Center Column: Metric Label */}
+                                <div className="text-center font-extrabold text-slate-600 text-[11px] uppercase tracking-wider font-mono">
+                                  {m.label}
+                                </div>
+                                {/* Right Column: Away Team Data */}
+                                <div className="text-right font-bold text-emerald-600">
+                                  {m.awayVal}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()
                 )}
               </div>
 
