@@ -16,12 +16,13 @@ interface AdminPanelProps {
   onTeamsUpdated?: () => void;
 }
 
-interface RoleApplication {
+interface PendingUserRequest {
   id: string;
   userId: string;
   username: string;
+  fullName?: string;
   requestedRole: UserRole;
-  status: string; // "pending" | "approved" | "rejected"
+  status: string;
   createdAt: string;
   type?: "Join" | "RoleChange";
 }
@@ -36,8 +37,8 @@ export default function AdminPanel({
   const [errorSec, setErrorSec] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  // Section 2: Role / Registration Applications
-  const [applications, setApplications] = useState<RoleApplication[]>([]);
+  // Section 2: Registration Approval Requests
+  const [applications, setApplications] = useState<PendingUserRequest[]>([]);
   const [resolvingAppId, setResolvingAppId] = useState<{ id: string; action: "approve" | "reject" } | null>(null);
 
   // Section 3: Profile Info Update Requests
@@ -63,10 +64,10 @@ export default function AdminPanel({
 
   const loadApplications = async () => {
     try {
-      const apps = await DataService.getApplications();
-      setApplications(apps);
+      const pendingList = await DataService.getPendingUsersFromSupabase();
+      setApplications(pendingList);
     } catch (err) {
-      console.warn("Failed to load applications:", err);
+      console.warn("Failed to load pending registration requests:", err);
     }
   };
 
@@ -97,23 +98,38 @@ export default function AdminPanel({
     }
   };
 
-  const handleResolveApp = async (appId: string, approve: boolean, userName?: string) => {
+  const handleApprovePendingUser = async (targetUserId: string, username?: string, appId?: string) => {
     try {
       setErrorSec("");
       setSuccessMsg("");
-      setResolvingAppId({ id: appId, action: approve ? "approve" : "reject" });
+      setResolvingAppId({ id: appId || targetUserId, action: "approve" });
 
-      await DataService.resolveApplication(appId, approve);
+      await DataService.approvePendingUserAccount(targetUserId, username, appId);
 
-      const targetName = userName || "User";
-      setSuccessMsg(approve 
-        ? `${targetName}'s registration/role request has been approved successfully!` 
-        : `Request for ${targetName} has been rejected.`
-      );
+      setSuccessMsg("User account approved successfully.");
       await loadApplications();
-      onRefreshUsers();
+      await loadRosterAndTeams();
+      if (onRefreshUsers) onRefreshUsers();
     } catch (err: any) {
-      setErrorSec(err.message || "Failed to resolve application.");
+      setErrorSec(err.message || "Failed to approve user registration.");
+    } finally {
+      setResolvingAppId(null);
+    }
+  };
+
+  const handleRejectPendingUser = async (targetUserId: string, username?: string, appId?: string) => {
+    try {
+      setErrorSec("");
+      setSuccessMsg("");
+      setResolvingAppId({ id: appId || targetUserId, action: "reject" });
+
+      await DataService.rejectPendingUserAccount(targetUserId, username, appId);
+
+      setSuccessMsg("User registration request rejected.");
+      await loadApplications();
+      if (onRefreshUsers) onRefreshUsers();
+    } catch (err: any) {
+      setErrorSec(err.message || "Failed to reject user registration.");
     } finally {
       setResolvingAppId(null);
     }
@@ -190,7 +206,7 @@ export default function AdminPanel({
         <div className="flex items-center gap-2 border-b border-[#334155] pb-3">
           <span className="bg-cyan-500/20 text-cyan-400 font-mono font-black px-2 py-0.5 rounded-md text-xs">1</span>
           <h3 className="font-display font-black text-sm text-white uppercase tracking-wider">
-            Excel Templates Download / Upload (Excel 템플릿)
+            Excel Templates Download / Upload
           </h3>
         </div>
         <ExcelTemplates currentUser={currentUser} />
@@ -203,7 +219,7 @@ export default function AdminPanel({
             <span className="bg-cyan-500/20 text-cyan-400 font-mono font-black px-2 py-0.5 rounded-md text-xs">2</span>
             <Shield className="h-4 w-4 text-cyan-400" />
             <h3 className="font-display font-black text-sm text-white uppercase tracking-wider">
-              Registration Approval Requests (회원가입 승인 요청 목록)
+              Registration Approval Requests
             </h3>
           </div>
           <span className="text-[10px] bg-cyan-950/60 text-cyan-400 font-bold border border-cyan-800/60 px-2.5 py-0.5 rounded-md uppercase tracking-wider">
@@ -212,20 +228,21 @@ export default function AdminPanel({
         </div>
 
         <div className="p-4">
-          {applications.filter(a => a.status === "pending").length === 0 ? (
+          {applications.length === 0 ? (
             <p className="text-xs text-slate-400 italic py-3 text-center">No pending registration or role approval requests currently.</p>
           ) : (
             <div className="divide-y divide-[#334155]">
-              {applications.filter(a => a.status === "pending").map((app) => {
-                const matchingUser = users.find(u => u.id === app.userId);
-                const fullName = matchingUser ? [matchingUser.firstName, matchingUser.lastName].filter(Boolean).join(" ") : "";
+              {applications.map((app) => {
+                const displayName = app.fullName || app.username || "User";
                 const displayType = app.type === "Join" ? "Membership Registration" : "Role Elevation";
                 return (
                   <div key={app.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs font-sans">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-white text-sm">{fullName || app.username}</span>
-                        {fullName && <span className="text-[11px] text-slate-400">({app.username})</span>}
+                        <span className="font-bold text-white text-sm">{displayName}</span>
+                        {app.username && app.username !== displayName && (
+                          <span className="text-[11px] text-slate-400">({app.username})</span>
+                        )}
                         <span className={`inline-flex items-center rounded px-2 py-0.5 text-[9.5px] font-bold ${
                           app.type === "Join" 
                             ? "bg-blue-950/60 text-blue-400 border border-blue-800/60" 
@@ -237,18 +254,18 @@ export default function AdminPanel({
                       <div className="mt-1 text-[11px] text-slate-300 flex items-center gap-1.5">
                         <span>Requested Role:</span>
                         <span className="inline-flex items-center rounded bg-cyan-950/80 border border-cyan-800/80 px-2 py-0.5 text-[10px] font-black text-cyan-400 uppercase tracking-wider">
-                          {app.requestedRole}
+                          {app.requestedRole || "Player"}
                         </span>
                       </div>
                       <p className="text-[10px] text-slate-400 mt-1 font-mono">Submitted: {new Date(app.createdAt).toLocaleDateString()}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
-                        disabled={resolvingAppId?.id === app.id}
-                        onClick={() => handleResolveApp(app.id, true, fullName || app.username)}
+                        disabled={resolvingAppId?.id === app.id || resolvingAppId?.id === app.userId}
+                        onClick={() => handleApprovePendingUser(app.userId, app.username, app.id)}
                         className="px-3.5 py-1.5 text-xs font-bold bg-emerald-950/80 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-800/80 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
                       >
-                        {resolvingAppId?.id === app.id && resolvingAppId.action === "approve" ? (
+                        {(resolvingAppId?.id === app.id || resolvingAppId?.id === app.userId) && resolvingAppId.action === "approve" ? (
                           <>
                             <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
                             <span>Approving...</span>
@@ -258,11 +275,11 @@ export default function AdminPanel({
                         )}
                       </button>
                       <button
-                        disabled={resolvingAppId?.id === app.id}
-                        onClick={() => handleResolveApp(app.id, false, fullName || app.username)}
+                        disabled={resolvingAppId?.id === app.id || resolvingAppId?.id === app.userId}
+                        onClick={() => handleRejectPendingUser(app.userId, app.username, app.id)}
                         className="px-3.5 py-1.5 text-xs font-bold bg-rose-950/80 text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-800/80 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
                       >
-                        {resolvingAppId?.id === app.id && resolvingAppId.action === "reject" ? (
+                        {(resolvingAppId?.id === app.id || resolvingAppId?.id === app.userId) && resolvingAppId.action === "reject" ? (
                           <>
                             <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-400" />
                             <span>Rejecting...</span>
@@ -287,7 +304,7 @@ export default function AdminPanel({
             <span className="bg-cyan-500/20 text-cyan-400 font-mono font-black px-2 py-0.5 rounded-md text-xs">3</span>
             <UserCog className="h-4 w-4 text-amber-400" />
             <h3 className="font-display font-black text-sm text-white uppercase tracking-wider">
-              Profile Info Update Requests (정보 수정 요청 목록)
+              Profile Info Update Requests
             </h3>
           </div>
           <span className="text-[10px] bg-amber-950/60 text-amber-400 font-bold border border-amber-800/60 px-2.5 py-0.5 rounded-md uppercase tracking-wider">
@@ -377,14 +394,14 @@ export default function AdminPanel({
         </div>
       </section>
 
-      {/* 4. Database Sync Button */}
+      {/* 4. Database Sync */}
       <section className="rounded-2xl border border-[#334155] bg-[#0f172a] p-5 shadow-xl space-y-4">
         <div className="flex items-center justify-between border-b border-[#334155] pb-3">
           <div className="flex items-center gap-2">
             <span className="bg-cyan-500/20 text-cyan-400 font-mono font-black px-2 py-0.5 rounded-md text-xs">4</span>
             <Database className="h-4 w-4 text-emerald-400" />
             <h3 className="font-display font-black text-sm text-white uppercase tracking-wider">
-              Database Sync Button (Database Sync 버튼)
+              Database Sync
             </h3>
           </div>
         </div>
@@ -416,14 +433,14 @@ export default function AdminPanel({
         </div>
       </section>
 
-      {/* 5. Registered Players List */}
+      {/* 5. Registered Players */}
       <section className="rounded-2xl border border-[#334155] bg-[#0f172a] overflow-hidden shadow-xl">
         <div className="bg-[#1e293b] border-b border-[#334155] px-4 py-3 flex items-center justify-between font-sans text-xs">
           <div className="flex items-center gap-2">
             <span className="bg-cyan-500/20 text-cyan-400 font-mono font-black px-2 py-0.5 rounded-md text-xs">5</span>
             <Users className="h-4 w-4 text-cyan-400" />
             <h3 className="font-display font-black text-sm text-white uppercase tracking-wider">
-              Registered Players List (가입된 회원/선수 목록)
+              Registered Players
             </h3>
           </div>
           <span className="text-[10px] bg-cyan-950/60 text-cyan-400 font-bold border border-cyan-800/60 px-2.5 py-0.5 rounded-md uppercase font-mono">
@@ -515,14 +532,14 @@ export default function AdminPanel({
         </div>
       </section>
 
-      {/* 6. Registered Teams List */}
+      {/* 6. Registered Squads */}
       <section className="rounded-2xl border border-[#334155] bg-[#0f172a] overflow-hidden shadow-xl">
         <div className="bg-[#1e293b] border-b border-[#334155] px-4 py-3 flex items-center justify-between font-sans text-xs">
           <div className="flex items-center gap-2">
             <span className="bg-cyan-500/20 text-cyan-400 font-mono font-black px-2 py-0.5 rounded-md text-xs">6</span>
             <Shield className="h-4 w-4 text-amber-400" />
             <h3 className="font-display font-black text-sm text-white uppercase tracking-wider">
-              Registered Teams List (가입된 팀 명단 목록)
+              Registered Squads
             </h3>
           </div>
           <span className="text-[10px] bg-amber-950/60 text-amber-400 font-bold border border-amber-800/60 px-2.5 py-0.5 rounded-md uppercase font-mono">
@@ -571,7 +588,7 @@ export default function AdminPanel({
         <div className="flex items-center gap-2 border-b border-[#334155] pb-3">
           <span className="bg-cyan-500/20 text-cyan-400 font-mono font-black px-2 py-0.5 rounded-md text-xs">7</span>
           <h3 className="font-display font-black text-sm text-white uppercase tracking-wider">
-            Team Upload (팀 업로드)
+            Team Upload
           </h3>
         </div>
         <BulkTeamImport 

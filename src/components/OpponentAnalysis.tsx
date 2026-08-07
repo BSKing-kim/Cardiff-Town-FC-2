@@ -1001,7 +1001,7 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
           </div>
         </div>
 
-        {/* Side-by-Side Detailed Comparison Grid matching "모든 항목을 다 보여줘" */}
+        {/* Side-by-Side Detailed Comparison Grid matching full metric view */}
         <div className="rounded-xl border border-[#E2E8F0] bg-white overflow-hidden shadow-xs">
           <div className="bg-[#F8FAFC] border-b border-[#E2E8F0] px-4 py-3 flex items-center justify-between">
             <h3 className="font-display font-extrabold text-[#0A2342] text-xs sm:text-sm flex items-center gap-1.5">

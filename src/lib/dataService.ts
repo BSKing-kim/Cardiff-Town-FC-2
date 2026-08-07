@@ -81,16 +81,16 @@ export class DataService {
 
   static getPositionPrefix(pos: string): string {
     const p = String(pos || "").trim().toUpperCase();
-    if (["GK", "GOALKEEPER", "골키퍼"].includes(p)) return "GK";
+    if (["GK", "GOALKEEPER"].includes(p)) return "GK";
     if (["LB"].includes(p)) return "LB";
-    if (["CB", "DEFENDER", "수비수"].includes(p)) return "CB";
+    if (["CB", "DEFENDER"].includes(p)) return "CB";
     if (["RB"].includes(p)) return "RB";
     if (["DM"].includes(p)) return "DM";
-    if (["CM", "MIDFIELDER", "미드필더"].includes(p)) return "CM";
+    if (["CM", "MIDFIELDER"].includes(p)) return "CM";
     if (["AM"].includes(p)) return "AM";
     if (["LW", "WINGER", "LM", "RM", "W"].includes(p)) return "LW";
     if (["RW"].includes(p)) return "RW";
-    if (["CF", "ST", "STRIKER", "공격수"].includes(p) || p.includes("FORW") || p.includes("STRI")) return "CF";
+    if (["CF", "ST", "STRIKER"].includes(p) || p.includes("FORW") || p.includes("STRI")) return "CF";
     if (["FB"].includes(p)) return "LB";
     return "CF";
   }
@@ -163,17 +163,17 @@ export class DataService {
   static migratePlayer(p: any): Player {
     let pos: PlayerPosition = "CF";
     const rawPos = String(p.position || "").trim().toUpperCase();
-    if (["GK", "골키퍼", "GOALKEEPER"].includes(rawPos)) pos = "GK";
+    if (["GK", "GOALKEEPER"].includes(rawPos)) pos = "GK";
     else if (["LB"].includes(rawPos)) pos = "LB";
-    else if (["CB", "수비수"].includes(rawPos) || rawPos.includes("DEF")) pos = "CB";
+    else if (["CB"].includes(rawPos) || rawPos.includes("DEF")) pos = "CB";
     else if (["RB"].includes(rawPos)) pos = "RB";
     else if (["FB"].includes(rawPos)) pos = "LB";
     else if (["DM"].includes(rawPos)) pos = "DM";
-    else if (["CM", "미드필더"].includes(rawPos) || rawPos.includes("MID")) pos = "CM";
+    else if (["CM"].includes(rawPos) || rawPos.includes("MID")) pos = "CM";
     else if (["AM"].includes(rawPos)) pos = "AM";
     else if (["LW", "WINGER", "W", "LM", "RM"].includes(rawPos)) pos = "LW";
     else if (["RW"].includes(rawPos)) pos = "RW";
-    else if (["CF", "ST", "SS", "공격수"].includes(rawPos) || rawPos.includes("FORW") || rawPos.includes("STRI")) pos = "CF";
+    else if (["CF", "ST", "SS"].includes(rawPos) || rawPos.includes("FORW") || rawPos.includes("STRI")) pos = "CF";
     else {
       const match = ["GK", "LB", "CB", "RB", "DM", "CM", "AM", "LW", "RW", "CF"].find(
         (val) => val.toUpperCase() === rawPos
@@ -2164,6 +2164,142 @@ export class DataService {
       await supabase.from("applications").upsert(this.sanitizeForSupabase(app));
     } catch (e) {
       console.warn("Supabase update application failed:", e);
+    }
+  }
+
+  static async getPendingUsersFromSupabase(): Promise<any[]> {
+    try {
+      const { data: pendingProfiles, error } = await (supabase.from('profiles') as any)
+        .select('*')
+        .or('status.eq.pending,status.is.null,status.eq.Pending');
+
+      const apps = await this.getRoleApplications(true);
+      const pendingApps = apps.filter(a => a.status === 'pending' || a.status === 'Pending');
+
+      const userMap = new Map<string, any>();
+
+      if (!error && Array.isArray(pendingProfiles)) {
+        pendingProfiles.forEach((p: any) => {
+          if (p.username?.toLowerCase() === DEFAULT_ADMIN.username.toLowerCase()) return;
+          const uId = p.id || p.user_id || p.username;
+          if (uId) {
+            userMap.set(uId, {
+              id: p.id || p.user_id || `app_${p.username}`,
+              userId: p.id || p.user_id,
+              username: p.username,
+              fullName: p.full_name,
+              role: p.role || 'Player',
+              requestedRole: p.role || 'Player',
+              status: p.status || 'pending',
+              createdAt: p.created_at || new Date().toISOString(),
+              type: 'Join'
+            });
+          }
+        });
+      }
+
+      pendingApps.forEach(a => {
+        if (a.username?.toLowerCase() === DEFAULT_ADMIN.username.toLowerCase()) return;
+        const key = a.userId || a.username || a.id;
+        if (!userMap.has(key)) {
+          userMap.set(key, {
+            id: a.id,
+            userId: a.userId,
+            username: a.username,
+            fullName: a.username,
+            role: a.requestedRole || a.rolePreference || 'Player',
+            requestedRole: a.requestedRole || a.rolePreference || 'Player',
+            status: a.status || 'pending',
+            createdAt: a.createdAt || new Date().toISOString(),
+            type: a.type || 'Join'
+          });
+        }
+      });
+
+      return Array.from(userMap.values());
+    } catch (err) {
+      console.warn("Error fetching pending registration users:", err);
+      return [];
+    }
+  }
+
+  static async approvePendingUserAccount(targetUserId: string, targetUsername?: string, appId?: string): Promise<void> {
+    try {
+      if (targetUserId) {
+        await (supabase.from('profiles') as any)
+          .update({ status: 'approved' })
+          .eq('id', targetUserId);
+
+        await (supabase.from('profiles') as any)
+          .update({ status: 'approved' })
+          .eq('user_id', targetUserId);
+      }
+
+      if (targetUsername) {
+        await (supabase.from('profiles') as any)
+          .update({ status: 'approved' })
+          .eq('username', targetUsername);
+      }
+    } catch (e) {
+      console.warn("Supabase approve user status failed:", e);
+    }
+
+    if (appId) {
+      try {
+        await this.approveRoleApplication(appId);
+      } catch {}
+    } else {
+      const apps = await this.getRoleApplications();
+      const match = apps.find(a => a.userId === targetUserId || a.username === targetUsername);
+      if (match) {
+        try {
+          await this.approveRoleApplication(match.id);
+        } catch {}
+      }
+    }
+
+    if (targetUserId) {
+      await this.updateUserPermission(targetUserId, { approved: true });
+    }
+  }
+
+  static async rejectPendingUserAccount(targetUserId: string, targetUsername?: string, appId?: string): Promise<void> {
+    try {
+      if (targetUserId) {
+        await (supabase.from('profiles') as any)
+          .update({ status: 'rejected' })
+          .eq('id', targetUserId);
+
+        await (supabase.from('profiles') as any)
+          .update({ status: 'rejected' })
+          .eq('user_id', targetUserId);
+      }
+
+      if (targetUsername) {
+        await (supabase.from('profiles') as any)
+          .update({ status: 'rejected' })
+          .eq('username', targetUsername);
+      }
+    } catch (e) {
+      console.warn("Supabase reject user status failed:", e);
+    }
+
+    if (appId) {
+      try {
+        await this.rejectRoleApplication(appId);
+      } catch {}
+    } else {
+      const apps = await this.getRoleApplications();
+      const match = apps.find(a => a.userId === targetUserId || a.username === targetUsername);
+      if (match) {
+        try {
+          await this.rejectRoleApplication(match.id);
+        } catch {}
+      }
+    }
+
+    if (targetUserId) {
+      await this.updateUserPermission(targetUserId, { approved: false });
     }
   }
 

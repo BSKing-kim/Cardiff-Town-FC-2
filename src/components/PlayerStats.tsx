@@ -220,13 +220,13 @@ export default function PlayerStats({ players, onPlayersUpdated, currentUser, ma
       } else {
         const pUpper = String(p.position || "").trim().toUpperCase();
         if (selectedPosition === "GK") {
-          matchesPosition = ["GK", "GOALKEEPER", "골키퍼"].includes(pUpper);
+          matchesPosition = ["GK", "GOALKEEPER"].includes(pUpper);
         } else if (selectedPosition === "DEF") {
-          matchesPosition = ["CB", "FB", "LB", "RB", "LWB", "RWB", "DEFENDER", "수비수"].includes(pUpper);
+          matchesPosition = ["CB", "FB", "LB", "RB", "LWB", "RWB", "DEFENDER"].includes(pUpper);
         } else if (selectedPosition === "MID") {
-          matchesPosition = ["CM", "DM", "AM", "CDM", "CAM", "RM", "LM", "MIDFIELDER", "미드필더"].includes(pUpper);
+          matchesPosition = ["CM", "DM", "AM", "CDM", "CAM", "RM", "LM", "MIDFIELDER"].includes(pUpper);
         } else if (selectedPosition === "ATT") {
-          matchesPosition = ["ST", "WINGER", "LW", "RW", "CF", "SS", "공격수", "FORWARD"].includes(pUpper);
+          matchesPosition = ["ST", "WINGER", "LW", "RW", "CF", "SS", "FORWARD"].includes(pUpper);
         }
       }
       return matchesPosition;
@@ -607,13 +607,12 @@ export default function PlayerStats({ players, onPlayersUpdated, currentUser, ma
   );
 }
 
-// Check with Korean or English position mapping
 function pIsPosition(playerPos: PlayerPosition, target: "Forward" | "Midfielder" | "Defender" | "Goalkeeper"): boolean {
   const p = String(playerPos).trim().toUpperCase();
-  if (target === "Forward") return ["LW", "RW", "CF", "ST", "WINGER", "FORWARD", "공격수"].includes(p);
-  if (target === "Midfielder") return ["DM", "CM", "AM", "MIDFIELDER", "미드필더"].includes(p);
-  if (target === "Defender") return ["LB", "CB", "RB", "FB", "DEFENDER", "수비수"].includes(p);
-  if (target === "Goalkeeper") return ["GK", "GOALKEEPER", "골키퍼"].includes(p);
+  if (target === "Forward") return ["LW", "RW", "CF", "ST", "WINGER", "FORWARD"].includes(p);
+  if (target === "Midfielder") return ["DM", "CM", "AM", "MIDFIELDER"].includes(p);
+  if (target === "Defender") return ["LB", "CB", "RB", "FB", "DEFENDER"].includes(p);
+  if (target === "Goalkeeper") return ["GK", "GOALKEEPER"].includes(p);
   return false;
 }
 
