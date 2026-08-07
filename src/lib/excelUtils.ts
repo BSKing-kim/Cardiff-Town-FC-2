@@ -299,9 +299,10 @@ export const parseMatchFixturesExcel = async (file: File): Promise<{ count: numb
     const opponent = extractString(row, ['opponent', 'Opponent', 'Opponent Team', 'VS']) || 'Opponent Team';
     const homeAway = extractString(row, ['home_away', 'Home/Away', 'Venue', 'homeAway']) || 'Home';
     const ourScore = extractInt(row, ['our_score', 'ourScore', 'Our Score', 'Goals For', 'goals']);
-    const oppScore = extractInt(row, ['opponent_score', 'opponentScore', 'Opponent Score', 'Goals Against']);
+    const oppScore = extractInt(row, ['opponent_score', 'opponentScore', 'Opponent Score', 'Goals Against', 'opp_goals']);
     const status = extractString(row, ['status', 'Status']) || 'completed';
     const possession = extractFloat(row, ['possession', 'Possession', 'possession_rate', 'possessionRate'], 50);
+    const oppPossession = extractFloat(row, ['opp_possession', 'oppPossession', 'Opponent Possession'], 100 - possession);
 
     return {
       id: matchId,
@@ -312,7 +313,9 @@ export const parseMatchFixturesExcel = async (file: File): Promise<{ count: numb
       opponent_score: oppScore,
       status: status,
       possession: possession,
+      opp_possession: oppPossession,
 
+      // OUR TEAM RAW COUNTS
       goals: extractInt(row, ['goals', 'Goals'], ourScore),
       shots: extractInt(row, ['shots', 'total_shots', 'totalShots', 'Shots']),
       shots_on_target: extractInt(row, ['shots_on_target', 'shotsOnTarget', 'Shots On Target', 'sot']),
@@ -350,7 +353,47 @@ export const parseMatchFixturesExcel = async (file: File): Promise<{ count: numb
       offsides: extractInt(row, ['offsides', 'Offsides']),
       fouls: extractInt(row, ['fouls', 'Fouls']),
       yellow_cards: extractInt(row, ['yellow_cards', 'yellowCards']),
-      red_cards: extractInt(row, ['red_cards', 'redCards'])
+      red_cards: extractInt(row, ['red_cards', 'redCards']),
+
+      // OPPONENT RAW COUNTS (opp_ prefix)
+      opp_goals: extractInt(row, ['opp_goals', 'oppGoals', 'Opponent Goals'], oppScore),
+      opp_shots: extractInt(row, ['opp_shots', 'oppShots', 'Opponent Shots']),
+      opp_shots_on_target: extractInt(row, ['opp_shots_on_target', 'oppShotsOnTarget', 'opp_sot']),
+      opp_passes: extractInt(row, ['opp_passes', 'oppPasses', 'Opponent Passes']),
+      opp_successful_passes: extractInt(row, ['opp_successful_passes', 'oppSuccessfulPasses']),
+      opp_backwards_passes: extractInt(row, ['opp_backwards_passes', 'oppBackwardsPasses']),
+      opp_forwards_passes: extractInt(row, ['opp_forwards_passes', 'oppForwardsPasses']),
+      opp_long_passes: extractInt(row, ['opp_long_passes', 'oppLongPasses']),
+      opp_successful_long_passes: extractInt(row, ['opp_successful_long_passes', 'oppSuccessfulLongPasses']),
+      opp_key_passes: extractInt(row, ['opp_key_passes', 'oppKeyPasses']),
+      opp_successful_key_passes: extractInt(row, ['opp_successful_key_passes', 'oppSuccessfulKeyPasses']),
+      opp_through_balls: extractInt(row, ['opp_through_balls', 'oppThroughBalls']),
+      opp_successful_through_balls: extractInt(row, ['opp_successful_through_balls', 'oppSuccessfulThroughBalls']),
+      opp_crosses: extractInt(row, ['opp_crosses', 'oppCrosses']),
+      opp_successful_crosses: extractInt(row, ['opp_successful_crosses', 'oppSuccessfulCrosses']),
+      opp_dribbles: extractInt(row, ['opp_dribbles', 'oppDribbles']),
+      opp_successful_dribbles: extractInt(row, ['opp_successful_dribbles', 'oppSuccessfulDribbles']),
+      opp_duels: extractInt(row, ['opp_duels', 'oppDuels']),
+      opp_duels_won: extractInt(row, ['opp_duels_won', 'oppDuelsWon']),
+      opp_aerial_duels: extractInt(row, ['opp_aerial_duels', 'oppAerialDuels']),
+      opp_aerial_duels_won: extractInt(row, ['opp_aerial_duels_won', 'oppAerialDuelsWon']),
+      opp_ground_duels: extractInt(row, ['opp_ground_duels', 'oppGroundDuels']),
+      opp_ground_duels_won: extractInt(row, ['opp_ground_duels_won', 'oppGroundDuelsWon']),
+      opp_ball_recoveries: extractInt(row, ['opp_ball_recoveries', 'oppBallRecoveries']),
+      opp_tackles: extractInt(row, ['opp_tackles', 'oppTackles']),
+      opp_tackles_won: extractInt(row, ['opp_tackles_won', 'oppTacklesWon']),
+      opp_interceptions: extractInt(row, ['opp_interceptions', 'oppInterceptions']),
+      opp_clearances: extractInt(row, ['opp_clearances', 'oppClearances']),
+      opp_blocks: extractInt(row, ['opp_blocks', 'oppBlocks']),
+      opp_own_goals: extractInt(row, ['opp_own_goals', 'oppOwnGoals']),
+      opp_turnovers: extractInt(row, ['opp_turnovers', 'oppTurnovers']),
+      opp_miscontrols: extractInt(row, ['opp_miscontrols', 'oppMiscontrols']),
+      opp_unsuccessful_dribbles: extractInt(row, ['opp_unsuccessful_dribbles', 'oppUnsuccessfulDribbles']),
+      opp_possession_lost: extractInt(row, ['opp_possession_lost', 'oppPossessionLost']),
+      opp_offsides: extractInt(row, ['opp_offsides', 'oppOffsides']),
+      opp_fouls: extractInt(row, ['opp_fouls', 'oppFouls']),
+      opp_yellow_cards: extractInt(row, ['opp_yellow_cards', 'oppYellowCards']),
+      opp_red_cards: extractInt(row, ['opp_red_cards', 'oppRedCards'])
     };
   }).filter(r => r.id !== '' || r.opponent !== '');
 
@@ -366,7 +409,10 @@ export const parseMatchFixturesExcel = async (file: File): Promise<{ count: numb
 
   const uniqueMatches = Object.keys(groupedByMatch).map(matchId => {
     const matchRows = groupedByMatch[matchId];
-    
+    if (matchRows.length === 1) {
+      return matchRows[0];
+    }
+
     // Row where Opponent is NOT Cardiff Town FC = OUR TEAM STATS
     const ourRow = matchRows.find(r => String(r.opponent || "").trim().toLowerCase() !== 'cardiff town fc') || matchRows[0];
     
@@ -374,6 +420,7 @@ export const parseMatchFixturesExcel = async (file: File): Promise<{ count: numb
     const oppRow = matchRows.find(r => String(r.opponent || "").trim().toLowerCase() === 'cardiff town fc') || matchRows[1] || {};
 
     return {
+      ...ourRow,
       id: matchId,
       date: ourRow.date,
       opponent: ourRow.opponent, // Enemy team name
@@ -1350,7 +1397,7 @@ export class ExcelUtils {
     ExcelUtils.downloadPlayerPerformanceTemplate();
   }
 
-  // 2. Download Match Fixtures Template (Match_Fixtures_Template.xlsx) - RAW count fields ONLY, NO percentage columns!
+  // 2. Download Match Fixtures Template (Match_Fixtures_Template.xlsx) - RAW count fields ONLY, NO percentage columns! Single row per match!
   static downloadMatchFixturesTemplate(): void {
     const headers = [
       "match_id",
@@ -1361,6 +1408,7 @@ export class ExcelUtils {
       "opponent_score",
       "status",
       "possession",
+      "opp_possession",
       "goals",
       "shots",
       "shots_on_target",
@@ -1398,7 +1446,45 @@ export class ExcelUtils {
       "offsides",
       "fouls",
       "yellow_cards",
-      "red_cards"
+      "red_cards",
+      "opp_goals",
+      "opp_shots",
+      "opp_shots_on_target",
+      "opp_passes",
+      "opp_successful_passes",
+      "opp_backwards_passes",
+      "opp_forwards_passes",
+      "opp_long_passes",
+      "opp_successful_long_passes",
+      "opp_key_passes",
+      "opp_successful_key_passes",
+      "opp_through_balls",
+      "opp_successful_through_balls",
+      "opp_crosses",
+      "opp_successful_crosses",
+      "opp_dribbles",
+      "opp_successful_dribbles",
+      "opp_duels",
+      "opp_duels_won",
+      "opp_aerial_duels",
+      "opp_aerial_duels_won",
+      "opp_ground_duels",
+      "opp_ground_duels_won",
+      "opp_ball_recoveries",
+      "opp_tackles",
+      "opp_tackles_won",
+      "opp_interceptions",
+      "opp_clearances",
+      "opp_blocks",
+      "opp_own_goals",
+      "opp_turnovers",
+      "opp_miscontrols",
+      "opp_unsuccessful_dribbles",
+      "opp_possession_lost",
+      "opp_offsides",
+      "opp_fouls",
+      "opp_yellow_cards",
+      "opp_red_cards"
     ];
 
     const sampleRows = [
@@ -1410,6 +1496,8 @@ export class ExcelUtils {
         "our_score": 2,
         "opponent_score": 1,
         "status": "Finished",
+        "possession": 55.4,
+        "opp_possession": 44.6,
         "goals": 2,
         "shots": 14,
         "shots_on_target": 7,
@@ -1447,54 +1535,44 @@ export class ExcelUtils {
         "offsides": 3,
         "fouls": 8,
         "yellow_cards": 1,
-        "red_cards": 0
-      },
-      {
-        "match_id": "M02",
-        "date": "2026-08-22",
-        "opponent": "Splott Albion",
-        "home_away": "Away",
-        "our_score": 0,
-        "opponent_score": 0,
-        "status": "Scheduled",
-        "goals": 0,
-        "shots": 10,
-        "shots_on_target": 4,
-        "passes": 320,
-        "successful_passes": 256,
-        "backwards_passes": 80,
-        "forwards_passes": 150,
-        "long_passes": 38,
-        "successful_long_passes": 24,
-        "key_passes": 8,
-        "successful_key_passes": 5,
-        "through_balls": 4,
-        "successful_through_balls": 2,
-        "crosses": 12,
-        "successful_crosses": 4,
-        "dribbles": 14,
-        "successful_dribbles": 8,
-        "duels": 76,
-        "duels_won": 40,
-        "aerial_duels": 24,
-        "aerial_duels_won": 12,
-        "ground_duels": 52,
-        "ground_duels_won": 28,
-        "ball_recoveries": 36,
-        "tackles": 18,
-        "tackles_won": 12,
-        "interceptions": 10,
-        "clearances": 14,
-        "blocks": 3,
-        "own_goals": 0,
-        "turnovers": 8,
-        "miscontrols": 6,
-        "unsuccessful_dribbles": 6,
-        "possession_lost": 14,
-        "offsides": 2,
-        "fouls": 10,
-        "yellow_cards": 2,
-        "red_cards": 0
+        "red_cards": 0,
+        "opp_goals": 1,
+        "opp_shots": 9,
+        "opp_shots_on_target": 4,
+        "opp_passes": 290,
+        "opp_successful_passes": 220,
+        "opp_backwards_passes": 70,
+        "opp_forwards_passes": 140,
+        "opp_long_passes": 50,
+        "opp_successful_long_passes": 28,
+        "opp_key_passes": 6,
+        "opp_successful_key_passes": 3,
+        "opp_through_balls": 4,
+        "opp_successful_through_balls": 2,
+        "opp_crosses": 10,
+        "opp_successful_crosses": 4,
+        "opp_dribbles": 12,
+        "opp_successful_dribbles": 6,
+        "opp_duels": 85,
+        "opp_duels_won": 37,
+        "opp_aerial_duels": 28,
+        "opp_aerial_duels_won": 13,
+        "opp_ground_duels": 57,
+        "opp_ground_duels_won": 24,
+        "opp_ball_recoveries": 38,
+        "opp_tackles": 18,
+        "opp_tackles_won": 11,
+        "opp_interceptions": 10,
+        "opp_clearances": 22,
+        "opp_blocks": 3,
+        "opp_own_goals": 0,
+        "opp_turnovers": 14,
+        "opp_miscontrols": 11,
+        "opp_possession_lost": 22,
+        "opp_offsides": 2,
+        "opp_fouls": 11,
+        "opp_yellow_cards": 2,
+        "opp_red_cards": 0
       }
     ];
 
