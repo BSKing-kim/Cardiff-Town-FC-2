@@ -344,20 +344,37 @@ export const parseMatchFixturesExcel = async (file: File): Promise<{ count: numb
     };
   }).filter(r => r.id !== '' || r.opponent !== '');
 
-  if (cleanMatchPayloads.length === 0) {
+  // Map to merge/deduplicate rows sharing the same match_id
+  const matchMap = new Map<string, any>();
+
+  cleanMatchPayloads.forEach(row => {
+    const matchId = String(row.id || (row as any).match_id).trim();
+    if (!matchId) return;
+
+    if (matchMap.has(matchId)) {
+      const existing = matchMap.get(matchId);
+      matchMap.set(matchId, { ...existing, ...row, id: matchId });
+    } else {
+      matchMap.set(matchId, { ...row, id: matchId });
+    }
+  });
+
+  const uniqueMatches = Array.from(matchMap.values());
+
+  if (uniqueMatches.length === 0) {
     throw new Error("No valid match fixture entries found in file.");
   }
 
   // Target public.matches strictly WITHOUT fallback to match_fixtures
   const { error: matchesErr } = await (supabase.from('matches') as any)
-    .upsert(cleanMatchPayloads, { onConflict: 'id' });
+    .upsert(uniqueMatches, { onConflict: 'id' });
 
   if (matchesErr) {
     console.warn("Supabase public.matches upsert error:", matchesErr.message);
   }
 
   // Mirror to DataService local cache
-  await DataService.saveMatches(cleanMatchPayloads.map(m => DataService.migrateMatch({
+  await DataService.saveMatches(uniqueMatches.map(m => DataService.migrateMatch({
     id: m.id,
     date: m.date,
     opponent: m.opponent,
@@ -373,7 +390,7 @@ export const parseMatchFixturesExcel = async (file: File): Promise<{ count: numb
     ...m
   })));
 
-  return { count: cleanMatchPayloads.length, data: cleanMatchPayloads };
+  return { count: uniqueMatches.length, data: uniqueMatches };
 };
 
 // Explicit standalone parser for Individual Player Stats (player_stats table)

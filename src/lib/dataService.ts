@@ -493,8 +493,24 @@ export class DataService {
           red_cards: row.red_cards ?? row.redCards ?? 0
         }));
 
+        // Map to merge/deduplicate rows sharing the same match_id
+        const matchMap = new Map<string, any>();
+        cleanMatchesPayload.forEach((row: any) => {
+          const matchId = String(row.id || row.match_id).trim();
+          if (!matchId) return;
+
+          if (matchMap.has(matchId)) {
+            const existing = matchMap.get(matchId);
+            matchMap.set(matchId, { ...existing, ...row, id: matchId });
+          } else {
+            matchMap.set(matchId, { ...row, id: matchId });
+          }
+        });
+
+        const uniqueMatches = Array.from(matchMap.values());
+
         const { error: matchesErr } = await (supabase.from("matches") as any)
-          .upsert(cleanMatchesPayload, { onConflict: 'id' });
+          .upsert(uniqueMatches, { onConflict: 'id' });
         if (matchesErr) {
           console.warn("Supabase public.matches upsert error:", matchesErr.message);
         }
