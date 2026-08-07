@@ -825,11 +825,18 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
               </thead>
               <tbody className="divide-y divide-[#334155]">
                 {filteredFixtures.map((f) => {
-                  const isPlayed = f.status === "Played" || f.status === "Completed" || f.status === "completed" || f.ourScore !== undefined;
+                  const rawOurScore = (f as any).our_score ?? (f as any).goals ?? f.ourScore;
+                  const rawOppScore = (f as any).opponent_score ?? (f as any).opp_goals ?? f.oppScore;
+                  const hasScore = (rawOurScore !== undefined && rawOurScore !== null) && 
+                                   (rawOppScore !== undefined && rawOppScore !== null);
+                  const isPlayed = f.status === "Played" || f.status === "Completed" || f.status === "completed" || hasScore;
+
                   const awayTeam = f.awayTeam || (f.venue === "Away" ? "Cardiff Town FC" : f.opponent);
                   const homeTeam = f.homeTeam || (f.venue === "Home" ? "Cardiff Town FC" : f.opponent);
-                  const awayScore = f.awayScore !== undefined ? f.awayScore : (f.venue === "Away" ? (f.ourScore ?? 0) : (f.oppScore ?? 0));
-                  const homeScore = f.homeScore !== undefined ? f.homeScore : (f.venue === "Home" ? (f.ourScore ?? 0) : (f.oppScore ?? 0));
+                  const displayOurScore = rawOurScore ?? 0;
+                  const displayOppScore = rawOppScore ?? 0;
+                  const awayScore = f.awayScore !== undefined ? f.awayScore : (f.venue === "Away" ? displayOurScore : displayOppScore);
+                  const homeScore = f.homeScore !== undefined ? f.homeScore : (f.venue === "Home" ? displayOurScore : displayOppScore);
 
                   return (
                     <tr 
@@ -873,13 +880,11 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
 
                       {/* Result / Status */}
                       <td className="py-3 px-4 text-center">
-                        {isPlayed ? (
+                        {isPlayed || hasScore ? (
                           <div className="flex flex-col items-center gap-1">
-                            <span className="inline-flex items-center gap-1.5 bg-[#0b0f19] border border-[#eab308]/40 px-3 py-1 rounded-lg font-mono font-black text-sm text-white shadow-xs">
-                              <span className={awayScore > homeScore ? "text-emerald-400 font-extrabold" : "text-white"}>{awayScore}</span>
-                              <span className="text-[#94a3b8]">:</span>
-                              <span className={homeScore > awayScore ? "text-emerald-400 font-extrabold" : "text-white"}>{homeScore}</span>
-                            </span>
+                            <div className="border border-amber-500/50 bg-slate-900/80 px-3 py-1 rounded text-center font-bold text-amber-400 font-mono text-sm shadow-xs inline-flex items-center gap-1.5">
+                              {hasScore ? `${displayOurScore} : ${displayOppScore}` : '- : -'}
+                            </div>
                             <span className="inline-flex items-center gap-1 text-[9px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
                               <CheckCircle className="h-2.5 w-2.5 shrink-0" />
                               Completed
