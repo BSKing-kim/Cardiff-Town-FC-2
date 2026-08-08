@@ -230,7 +230,8 @@ export default function IndividualPlayerDashboard({
 
   // Fallback player object if unmatched or null
   const activePlayerObj: Player = useMemo(() => {
-    const baseObj = (player && !isUnmatched) ? player : {
+    const targetPlayerObj = selectedPlayer || player;
+    const baseObj = (targetPlayerObj && !isUnmatched) ? targetPlayerObj : {
       id: "unlinked-profile",
       name: currentUser
         ? (currentUser.firstName && currentUser.lastName
@@ -271,7 +272,7 @@ export default function IndividualPlayerDashboard({
     }
 
     return baseObj as unknown as Player;
-  }, [player, currentUser, isUnmatched, aggregatedStats, fetchedPlayerStats]);
+  }, [selectedPlayer, player, currentUser, isUnmatched, aggregatedStats, fetchedPlayerStats]);
 
   // Safe value extraction & percentage formula helpers
   const safeVal = (v: any) => {
@@ -360,8 +361,8 @@ export default function IndividualPlayerDashboard({
         const matchInfo = (matches || []).find(m => String(m.id).trim() === String(mMatchId).trim());
 
         return {
-          matchName: matchInfo?.opponent ? `vs ${matchInfo.opponent}` : mMatchId,
-          date: matchInfo?.date || row.created_at?.slice(0, 10) || `2026-07-0${idx + 1}`,
+          matchName: matchInfo?.opponent ? `vs ${matchInfo.opponent}` : (row.opponent ? `vs ${row.opponent}` : mMatchId),
+          date: matchInfo?.date || row.created_at?.slice(0, 10) || `Match #${idx + 1}`,
           goalConv: safeDivPct(mGoals, mShots),
           passAcc: safeDivPct(mCompPasses, mPasses),
           shotAcc: safeDivPct(mSot, mShots),
@@ -372,40 +373,8 @@ export default function IndividualPlayerDashboard({
       });
     }
 
-    const safeMatches = Array.isArray(matches) ? matches : [];
-    const ourMatches = safeMatches.filter(m => m && !m.isOpponentTeam).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-
-    if (ourMatches.length > 0) {
-      return ourMatches.map((m) => {
-        const mGoals = safeVal((m as any).goals);
-        const mShots = safeVal((m as any).shots);
-        const mSot = safeVal((m as any).shotsOnTarget || (m as any).shots_on_target);
-        const mPasses = safeVal((m as any).totalPasses || (m as any).passes);
-        const mCompPasses = safeVal((m as any).successfulPasses || (m as any).completed_passes);
-        const mDuels = safeVal((m as any).duels);
-        const mDuelsWon = safeVal((m as any).duelsWon || (m as any).duels_won);
-        const mTackles = safeVal((m as any).tackles);
-        const mTacklesWon = safeVal((m as any).tacklesWon || (m as any).tackles_won);
-
-        return {
-          matchName: m.opponent ? `vs ${m.opponent}` : "Match",
-          date: m.date || "2026-07-01",
-          goalConv: safeDivPct(mGoals, mShots) || goalConvPct,
-          passAcc: safeDivPct(mCompPasses, mPasses) || passAcc,
-          shotAcc: safeDivPct(mSot, mShots) || shotAccuracy,
-          duelWon: safeDivPct(mDuelsWon, mDuels) || duelWonPct,
-          tackleWon: safeDivPct(mTacklesWon, mTackles) || tackleWonPct,
-          result: m.result || "D (0-0)"
-        };
-      });
-    }
-
-    return [
-      { matchName: "Match #1", date: "2026-07-04", goalConv: goalConvPct, passAcc, shotAcc: shotAccuracy, duelWon: duelWonPct, tackleWon: tackleWonPct, result: "N/A" },
-      { matchName: "Match #2", date: "2026-07-11", goalConv: goalConvPct, passAcc, shotAcc: shotAccuracy, duelWon: duelWonPct, tackleWon: tackleWonPct, result: "N/A" },
-      { matchName: "Match #3", date: "2026-07-18", goalConv: goalConvPct, passAcc, shotAcc: shotAccuracy, duelWon: duelWonPct, tackleWon: tackleWonPct, result: "N/A" }
-    ];
-  }, [fetchedPlayerStats, matches, goalConvPct, passAcc, shotAccuracy, duelWonPct, tackleWonPct]);
+    return [];
+  }, [fetchedPlayerStats, matches]);
 
   const [selectedMatchFilter, setSelectedMatchFilter] = useState<string>("all");
 
@@ -561,10 +530,23 @@ export default function IndividualPlayerDashboard({
     ];
   }, [activeMetrics]);
 
-  const preferredFoot = (currentUser as any)?.preferred_foot || (currentUser as any)?.preferredFoot || activePlayerObj.preferredFoot || "Right";
-  const nationality = (currentUser as any)?.nationality || activePlayerObj.nationality || "Wales";
-  const position = (currentUser as any)?.position || activePlayerObj.position || "CM";
-  const backNumberVal = (currentUser as any)?.squad_number || (currentUser as any)?.squadNumber || (currentUser as any)?.back_number || (currentUser as any)?.backNumber || (currentUser as any)?.jersey_number || (activePlayerObj.backNumber ? String(activePlayerObj.backNumber) : "N/A");
+  const targetPlayer = selectedPlayer || player;
+
+  const position = targetPlayer
+    ? (targetPlayer.position || (targetPlayer as any).primary_position || activePlayerObj.position || "-")
+    : ((currentUser as any)?.position || activePlayerObj.position || "-");
+
+  const nationality = targetPlayer
+    ? (targetPlayer.nationality || (targetPlayer as any).country || activePlayerObj.nationality || "-")
+    : ((currentUser as any)?.nationality || activePlayerObj.nationality || "-");
+
+  const preferredFoot = targetPlayer
+    ? (targetPlayer.preferred_foot || targetPlayer.preferredFoot || (targetPlayer as any).foot || activePlayerObj.preferredFoot || "-")
+    : ((currentUser as any)?.preferred_foot || (currentUser as any)?.preferredFoot || activePlayerObj.preferredFoot || "-");
+
+  const backNumberVal = targetPlayer
+    ? (targetPlayer.squad_number || targetPlayer.player_number || targetPlayer.backNumber || targetPlayer.back_number || (targetPlayer as any).number || (activePlayerObj.backNumber ? String(activePlayerObj.backNumber) : "-"))
+    : ((currentUser as any)?.squad_number || (currentUser as any)?.squadNumber || (currentUser as any)?.back_number || (currentUser as any)?.backNumber || (activePlayerObj.backNumber ? String(activePlayerObj.backNumber) : "N/A"));
 
   const handleOpenEditModal = () => {
     setEditForm({
@@ -814,75 +796,87 @@ export default function IndividualPlayerDashboard({
         </div>
 
         <div className="h-72 w-full pt-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={trendData.slice(-10)} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.6} />
-              <XAxis 
-                dataKey="matchName" 
-                stroke="#94a3b8" 
-                tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: "bold" }} 
-              />
-              <YAxis 
-                domain={[0, 100]} 
-                stroke="#94a3b8" 
-                tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: "bold" }} 
-                unit="%"
-              />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: "#0b0f19", 
-                  borderColor: "#334155", 
-                  borderRadius: "12px", 
-                  color: "#ffffff",
-                  fontSize: "12px",
-                  fontWeight: "bold"
-                }} 
-              />
-              <Legend 
-                wrapperStyle={{ paddingTop: "12px", fontSize: "11px", fontWeight: "bold" }}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="goalConv" 
-                name="Goal Conversion %" 
-                stroke="#eab308" 
-                strokeWidth={2.5} 
-                dot={{ fill: "#eab308", r: 4 }} 
-              />
-              <Line 
-                type="monotone" 
-                dataKey="passAcc" 
-                name="Pass Accuracy %" 
-                stroke="#06b6d4" 
-                strokeWidth={2.5} 
-                dot={{ fill: "#06b6d4", r: 4 }} 
-              />
-              <Line 
-                type="monotone" 
-                dataKey="shotAcc" 
-                name="Shot Accuracy %" 
-                stroke="#3b82f6" 
-                strokeWidth={2.5} 
-                dot={{ fill: "#3b82f6", r: 4 }} 
-              />
-              <Line 
-                type="monotone" 
-                dataKey="duelWon" 
-                name="Duel Won %" 
-                stroke="#10b981" 
-                strokeWidth={2.5} 
-                dot={{ fill: "#10b981", r: 4 }} 
-              />
-              <Line 
-                type="monotone" 
-                dataKey="tackleWon" 
-                name="Tackle Won %" 
-                stroke="#a855f7" 
-                strokeWidth={2.5} 
-                dot={{ fill: "#a855f7", r: 4 }} 
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          {trendData.length === 0 ? (
+            <div className="h-full w-full rounded-xl bg-[#0b0f19] border border-slate-800 flex flex-col items-center justify-center text-center p-6 space-y-2">
+              <BarChart2 className="w-8 h-8 text-slate-600" />
+              <p className="text-sm font-bold text-slate-300">
+                No match statistics recorded yet for this player.
+              </p>
+              <p className="text-xs text-slate-500 max-w-sm">
+                Upload match performance excel files in Admin Center to populate this player's trend chart.
+              </p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={trendData.slice(-10)} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.6} />
+                <XAxis 
+                  dataKey="matchName" 
+                  stroke="#94a3b8" 
+                  tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: "bold" }} 
+                />
+                <YAxis 
+                  domain={[0, 100]} 
+                  stroke="#94a3b8" 
+                  tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: "bold" }} 
+                  unit="%"
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: "#0b0f19", 
+                    borderColor: "#334155", 
+                    borderRadius: "12px", 
+                    color: "#ffffff",
+                    fontSize: "12px",
+                    fontWeight: "bold"
+                  }} 
+                />
+                <Legend 
+                  wrapperStyle={{ paddingTop: "12px", fontSize: "11px", fontWeight: "bold" }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="goalConv" 
+                  name="Goal Conversion %" 
+                  stroke="#eab308" 
+                  strokeWidth={2.5} 
+                  dot={{ fill: "#eab308", r: 4 }} 
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="passAcc" 
+                  name="Pass Accuracy %" 
+                  stroke="#06b6d4" 
+                  strokeWidth={2.5} 
+                  dot={{ fill: "#06b6d4", r: 4 }} 
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="shotAcc" 
+                  name="Shot Accuracy %" 
+                  stroke="#3b82f6" 
+                  strokeWidth={2.5} 
+                  dot={{ fill: "#3b82f6", r: 4 }} 
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="duelWon" 
+                  name="Duel Won %" 
+                  stroke="#10b981" 
+                  strokeWidth={2.5} 
+                  dot={{ fill: "#10b981", r: 4 }} 
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="tackleWon" 
+                  name="Tackle Won %" 
+                  stroke="#a855f7" 
+                  strokeWidth={2.5} 
+                  dot={{ fill: "#a855f7", r: 4 }} 
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
