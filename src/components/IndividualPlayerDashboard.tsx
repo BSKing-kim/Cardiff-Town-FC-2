@@ -727,7 +727,7 @@ export default function IndividualPlayerDashboard({
             </div>
             <div>
               <span className="text-[#94a3b8] text-[10px] uppercase font-bold tracking-wider block">Squad #</span>
-              <span className="font-extrabold text-white text-sm mt-0.5 block">{backNumberVal !== "N/A" ? (backNumberVal.startsWith('#') ? backNumberVal : `#${backNumberVal}`) : "Unassigned"}</span>
+              <span className="font-extrabold text-white text-sm mt-0.5 block">{backNumberVal !== "N/A" ? (typeof backNumberVal === 'string' && backNumberVal.startsWith('#') ? backNumberVal : `#${backNumberVal}`) : "Unassigned"}</span>
             </div>
           </div>
 

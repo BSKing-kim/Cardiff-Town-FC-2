@@ -346,7 +346,7 @@ export default function AdminPanel({
                         </span>
                         {backNum !== "N/A" && (
                           <span className="bg-[#1e293b] px-2.5 py-1 rounded-lg border border-[#334155]">
-                            <strong className="text-slate-400">Squad #:</strong> {backNum.startsWith('#') ? backNum : `#${backNum}`}
+                            <strong className="text-slate-400">Squad #:</strong> {typeof backNum === 'string' && backNum.startsWith('#') ? backNum : `#${backNum}`}
                           </span>
                         )}
                       </div>
@@ -444,7 +444,7 @@ export default function AdminPanel({
             </h3>
           </div>
           <span className="text-[10px] bg-cyan-950/60 text-cyan-400 font-bold border border-cyan-800/60 px-2.5 py-0.5 rounded-md uppercase font-mono">
-            {profilesList.length > 0 ? profilesList.length : playersList.filter(p => !p.id.toUpperCase().startsWith("OPP")).length} Profiles
+            {profilesList.length > 0 ? profilesList.length : playersList.filter(p => typeof p?.id === 'string' && !p.id.toUpperCase().startsWith("OPP")).length} Profiles
           </span>
         </div>
 
@@ -468,7 +468,7 @@ export default function AdminPanel({
                     <span className="text-xs text-slate-400 font-mono">Loading squad players...</span>
                   </td>
                 </tr>
-              ) : profilesList.length === 0 && playersList.filter(p => !p.id.toUpperCase().startsWith("OPP")).length === 0 ? (
+              ) : profilesList.length === 0 && playersList.filter(p => typeof p?.id === 'string' && !p.id.toUpperCase().startsWith("OPP")).length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-6 text-center text-slate-400 italic">
                     No registered player profiles found in database.
@@ -502,7 +502,7 @@ export default function AdminPanel({
                 ))
               ) : (
                 playersList
-                  .filter(p => !p.id.toUpperCase().startsWith("OPP"))
+                  .filter(p => typeof p?.id === 'string' && !p.id.toUpperCase().startsWith("OPP"))
                   .map((p) => (
                     <tr key={p.id} className="hover:bg-[#1e293b]/60 transition-colors">
                       <td className="py-3 px-4 font-bold text-white flex items-center gap-2">
