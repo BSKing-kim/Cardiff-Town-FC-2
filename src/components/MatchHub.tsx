@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { MatchData, UserProfile } from "../types";
 import { DataService } from "../lib/dataService";
-import { 
+import {
   TrendingUp, Calendar, ChevronDown, Layers, Trophy, RefreshCw
 } from "lucide-react";
 import TeamLogo from "./TeamLogo";
@@ -180,14 +180,14 @@ export default function MatchHub({ matches: propMatches, currentUser, onSelectOp
 
     const percentageMetrics = [
       { key: "shotAcc", label: "Shot Accuracy", home: calcAcc(homeStats.shotsOnTarget, homeStats.shots), away: calcAcc(awayStats.shotsOnTarget, awayStats.shots) },
+      { key: "goalConv", label: "Goal Conversion %", home: calcAcc(homeStats.goals, homeStats.shots), away: calcAcc(awayStats.goals, awayStats.shots) },
       { key: "passAcc", label: "Pass Accuracy", home: calcAcc(homeStats.successfulPasses, homeStats.passes), away: calcAcc(awayStats.successfulPasses, awayStats.passes) },
       { key: "duelWon", label: "Duel Won %", home: calcAcc(homeStats.duelsWon, homeStats.duels), away: calcAcc(awayStats.duelsWon, awayStats.duels) },
       { key: "tackleWon", label: "Tackle Won %", home: calcAcc(homeStats.tacklesWon, homeStats.tackles), away: calcAcc(awayStats.tacklesWon, awayStats.tackles) },
       { key: "longPassSuc", label: "Long Pass Suc %", home: calcAcc(homeStats.successfulLongPasses, homeStats.longPasses), away: calcAcc(awayStats.successfulLongPasses, awayStats.longPasses) },
       { key: "keyPassSuc", label: "Key Pass Suc %", home: calcAcc(homeStats.successfulKeyPasses, homeStats.keyPasses), away: calcAcc(awayStats.successfulKeyPasses, awayStats.keyPasses) },
       { key: "throughBallSuc", label: "Through Ball Suc %", home: calcAcc(homeStats.successfulThroughBalls, homeStats.throughBalls), away: calcAcc(awayStats.successfulThroughBalls, awayStats.throughBalls) },
-      { key: "crossSuc", label: "Cross Suc %", home: calcAcc(homeStats.successfulCrosses, homeStats.crosses), away: calcAcc(awayStats.successfulCrosses, awayStats.crosses) },
-      { key: "dribbleSuc", label: "Dribble Suc %", home: calcAcc(homeStats.successfulDribbles, homeStats.dribbles), away: calcAcc(awayStats.successfulDribbles, awayStats.dribbles) }
+      { key: "crossSuc", label: "Cross Suc %", home: calcAcc(homeStats.successfulCrosses, homeStats.crosses), away: calcAcc(awayStats.successfulCrosses, awayStats.crosses) }
     ];
 
     const numericComparisonList = [
@@ -279,9 +279,9 @@ export default function MatchHub({ matches: propMatches, currentUser, onSelectOp
 
         {/* Scoreboard Header */}
         {matchAnalysis && (
-          <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 sm:p-5 flex items-center justify-between shadow-inner">
+          <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 sm:p-5 flex flex-col md:flex-row items-center justify-between gap-6 md:gap-4 shadow-inner">
             {/* Home Team */}
-            <div className="flex flex-col items-center gap-2 w-1/3 text-center">
+            <div className="flex flex-col items-center gap-2 w-full md:w-1/3 text-center">
               <TeamLogo teamName={matchAnalysis.homeTeam} size={48} className="bg-slate-800 p-1.5 rounded-xl border border-slate-700 shadow-md" />
               <span className="text-sm font-extrabold text-white truncate w-full" title={matchAnalysis.homeTeam}>
                 {matchAnalysis.homeTeam}
@@ -302,7 +302,7 @@ export default function MatchHub({ matches: propMatches, currentUser, onSelectOp
             </div>
 
             {/* Away Team */}
-            <div className="flex flex-col items-center gap-2 w-1/3 text-center">
+            <div className="flex flex-col items-center gap-2 w-full md:w-1/3 text-center">
               <TeamLogo teamName={matchAnalysis.awayTeam} size={48} className="bg-slate-800 p-1.5 rounded-xl border border-slate-700 shadow-md" />
               <span className="text-sm font-extrabold text-white truncate w-full" title={matchAnalysis.awayTeam}>
                 {matchAnalysis.awayTeam}
@@ -318,7 +318,7 @@ export default function MatchHub({ matches: propMatches, currentUser, onSelectOp
       {/* DUAL DONUT CHARTS SECTION */}
       {matchAnalysis && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-800 pb-2 gap-2">
             <h2 className="font-display font-black text-base text-white uppercase tracking-wider flex items-center gap-2">
               <TrendingUp className="h-4.5 w-4.5 text-cyan-400" />
               Percentage & Accuracy KPIs (Home vs Away)
@@ -335,10 +335,10 @@ export default function MatchHub({ matches: propMatches, currentUser, onSelectOp
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {matchAnalysis.percentageMetrics.map(item => (
-              <div 
-                key={item.key} 
+              <div
+                key={item.key}
                 className="bg-[#0f172a] border border-slate-800/90 rounded-xl p-4 flex items-center justify-between shadow-xl"
               >
                 {/* Home Donut */}
@@ -385,11 +385,10 @@ export default function MatchHub({ matches: propMatches, currentUser, onSelectOp
               </div>
 
               {matchAnalysis.numericComparisonList.map((row, idx) => (
-                <div 
+                <div
                   key={row.label}
-                  className={`p-3 grid grid-cols-3 text-center transition-colors ${
-                    idx % 2 === 0 ? "bg-slate-900/40 hover:bg-slate-800/50" : "bg-transparent hover:bg-slate-800/50"
-                  }`}
+                  className={`p-3 grid grid-cols-3 text-center transition-colors ${idx % 2 === 0 ? "bg-slate-900/40 hover:bg-slate-800/50" : "bg-transparent hover:bg-slate-800/50"
+                    }`}
                 >
                   <span className="font-mono font-bold text-cyan-300 text-sm">{row.home}</span>
                   <span className="font-bold text-slate-200 uppercase tracking-wider text-xs flex items-center justify-center">{row.label}</span>

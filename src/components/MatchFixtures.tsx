@@ -897,7 +897,7 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
       ) : displayMode === "table" ? (
         /* Table Layout: Match Performance Log Directory */
         <div className="rounded-2xl border border-[#334155] bg-[#1e293b] overflow-hidden shadow-xl">
-          <div className="overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-200">
               <thead className="bg-[#0f172a] text-[#94a3b8] uppercase font-mono text-[10px] tracking-wider border-b border-[#334155]">
                 <tr>
@@ -1101,6 +1101,153 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Stacked Card View */}
+          <div className="md:hidden divide-y divide-[#334155]">
+            {filteredFixtures.map((f) => {
+              const isCardiffHome = f.venue === "Home" || (f as any).home_away === "Home" || f.homeTeam === "Cardiff Town FC";
+              const homeTeam = isCardiffHome ? "Cardiff Town FC" : f.opponent;
+              const awayTeam = isCardiffHome ? f.opponent : "Cardiff Town FC";
+              
+              const matchRecord = allMatchData.find(m => 
+                String(m.id).trim() === String(f.id).trim() ||
+                String((m as any).match_id).trim() === String(f.id).trim()
+              );
+
+              const rawOurScore = matchRecord != null
+                ? ((matchRecord as any).our_score ?? (matchRecord as any).ourScore ?? (matchRecord as any).goals)
+                : undefined;
+              const rawOppScore = matchRecord != null
+                ? ((matchRecord as any).opponent_score ?? (matchRecord as any).oppScore ?? (matchRecord as any).opp_goals)
+                : undefined;
+              const displayOurScore = rawOurScore ?? (f as any).our_score ?? (f as any).goals ?? f.ourScore;
+              const displayOppScore = rawOppScore ?? (f as any).opponent_score ?? (f as any).opp_goals ?? f.oppScore;
+
+              const isValidScore = (v: any) => v !== undefined && v !== null && v !== '' && v !== '-';
+              const hasScore = isValidScore(displayOurScore) && isValidScore(displayOppScore);
+
+              const isMatchUploaded = Boolean(
+                matchRecord || hasScore ||
+                f.status === 'Played' || f.status === 'Completed' || f.status === 'completed'
+              );
+
+              const isPlayed = isMatchUploaded || hasScore;
+              const isAnalysisAvailable = isMatchUploaded;
+
+              const homeScore = isCardiffHome ? (isValidScore(displayOurScore) ? displayOurScore : '-') : (isValidScore(displayOppScore) ? displayOppScore : '-');
+              const awayScore = isCardiffHome ? (isValidScore(displayOppScore) ? displayOppScore : '-') : (isValidScore(displayOurScore) ? displayOurScore : '-');
+
+              return (
+                <div 
+                  key={f.id} 
+                  className="flex flex-col justify-between p-4 gap-3 hover:bg-[#0b0f19]/50 transition-colors cursor-pointer"
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest("button, input, a")) return;
+                    if (isAnalysisAvailable) {
+                      loadAllMatchData();
+                      setSelectedAnalysisFixture(f);
+                    }
+                  }}
+                >
+                  <div className="flex flex-col text-left gap-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-white font-mono text-xs">{f.date}</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-[#eab308] uppercase font-bold bg-[#0b0f19] px-2 py-0.5 rounded border border-[#eab308]/30 font-mono">
+                          {f.competition}
+                        </span>
+                        {f.division && (
+                          <span className="text-[9px] text-[#94a3b8] bg-[#0b0f19] px-1.5 py-0.5 rounded border border-[#334155]">
+                            {f.division}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between font-bold text-white text-sm my-1">
+                      <div className="flex items-center gap-1.5">
+                        <TeamLogo teamName={homeTeam} size={20} className="rounded shrink-0" />
+                        <span className="text-white truncate max-w-[120px]">{homeTeam}</span>
+                      </div>
+                      <span className="text-[10px] text-[#94a3b8] font-mono px-2">vs</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-300 truncate max-w-[120px]">{awayTeam}</span>
+                        <TeamLogo teamName={awayTeam} size={20} className="rounded shrink-0" />
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-[#94a3b8] flex items-center gap-1">
+                      <MapPin className="h-3 w-3 shrink-0 text-[#eab308]" />
+                      <span className="truncate">
+                        {f.venue === "Home" ? "Cardiff Town Arena (Home)" : `${f.opponent}'s Stadium (Away)`}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#334155]/80">
+                    {isPlayed || hasScore ? (
+                      <div className="flex items-center gap-1.5">
+                        <div className="border border-amber-500/50 bg-slate-900/80 px-2.5 py-0.5 rounded font-bold text-amber-400 font-mono text-xs">
+                          {hasScore ? `${homeScore} : ${awayScore}` : '- : -'}
+                        </div>
+                        <span className="inline-flex items-center gap-1 text-[9px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold uppercase">
+                          <CheckCircle className="h-2.5 w-2.5 shrink-0" />
+                          Completed
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-md font-bold uppercase">
+                        <Clock className="h-3 w-3 shrink-0" />
+                        Upcoming
+                      </span>
+                    )}
+
+                    <div className="flex items-center gap-1.5">
+                      {isAuthorized && (
+                        <>
+                          <input
+                            type="file"
+                            id={`mob-table-upload-${f.id}`}
+                            className="hidden"
+                            accept=".xlsx,.xls,.csv"
+                            onChange={(e) => handleFixtureFileUpload(e, f)}
+                          />
+                          <button
+                            onClick={() => document.getElementById(`mob-table-upload-${f.id}`)?.click()}
+                            className="flex items-center gap-1 py-1 px-2 rounded-lg bg-[#eab308] text-[#0b0f19] text-xs font-black shrink-0"
+                            title="Upload Data"
+                          >
+                            <Upload className="h-3.5 w-3.5 shrink-0" />
+                            <span>Upload</span>
+                          </button>
+                        </>
+                      )}
+                      {isAnalysisAvailable && (
+                        <button
+                          onClick={() => {
+                            loadAllMatchData();
+                            setSelectedAnalysisFixture(f);
+                          }}
+                          className="flex items-center gap-1 py-1 px-2 rounded-lg bg-emerald-600 text-white text-xs font-bold shrink-0"
+                          title="View Analysis"
+                        >
+                          <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+                          <span>Analysis</span>
+                        </button>
+                      )}
+                      {isAuthorized && isPlayed && (
+                        <button
+                          onClick={() => handleRevertMatchStats(f.id, f.opponent)}
+                          className="p-1 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30 shrink-0"
+                          title="Clear Uploaded Match Data"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       ) : (
@@ -1460,6 +1607,11 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                         awayPct: calcPct(analysisData?.awayData?.shotsOnTarget || 0, analysisData?.awayData?.shots || 0),
                       },
                       {
+                        title: "Goal Conversion %",
+                        homePct: calcPct(analysisData?.homeData?.goals || 0, analysisData?.homeData?.shots || 0),
+                        awayPct: calcPct(analysisData?.awayData?.goals || 0, analysisData?.awayData?.shots || 0),
+                      },
+                      {
                         title: "Pass Accuracy",
                         homePct: calcPct(analysisData?.homeData?.successfulPasses || 0, analysisData?.homeData?.totalPasses || 0),
                         awayPct: calcPct(analysisData?.awayData?.successfulPasses || 0, analysisData?.awayData?.totalPasses || 0),
@@ -1493,12 +1645,7 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
                         title: "Cross Suc %",
                         homePct: calcPct(analysisData?.homeData?.successfulCrosses || 0, analysisData?.homeData?.crosses || 0),
                         awayPct: calcPct(analysisData?.awayData?.successfulCrosses || 0, analysisData?.awayData?.crosses || 0),
-                      },
-                      {
-                        title: "Dribble Suc %",
-                        homePct: calcPct(analysisData?.homeData?.successfulDribbles || 0, analysisData?.homeData?.dribbles || 0),
-                        awayPct: calcPct(analysisData?.awayData?.successfulDribbles || 0, analysisData?.awayData?.dribbles || 0),
-                      },
+                      }
                     ];
 
                     const detailedMetricList = [

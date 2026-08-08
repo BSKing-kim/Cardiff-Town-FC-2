@@ -723,7 +723,7 @@ export default function IndividualPlayerDashboard({
       )}
 
       {/* 1. Header Profile Header & Attributes */}
-      <div className="bg-[#1e293b] border border-[#334155] rounded-2xl p-5 sm:p-6 shadow-lg flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+      <div className="bg-[#1e293b] border border-[#334155] rounded-2xl p-5 sm:p-6 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6 md:gap-4">
         
         {/* Left Side: Avatar & Player Info */}
         <div className="flex items-center gap-4 sm:gap-5">
@@ -760,7 +760,7 @@ export default function IndividualPlayerDashboard({
         </div>
 
         {/* Right Box: Player Profile Attributes */}
-        <div className="bg-[#0b0f19] border border-[#334155] rounded-xl p-4 sm:p-5 min-w-[320px] lg:max-w-lg w-full lg:w-auto">
+        <div className="bg-[#0b0f19] border border-[#334155] rounded-xl p-4 sm:p-5 min-w-0 md:min-w-[320px] lg:max-w-lg w-full lg:w-auto">
           <div className="flex items-center justify-between border-b border-[#334155] pb-2 mb-3">
             <h4 className="text-xs font-extrabold uppercase tracking-wider text-[#94a3b8]">
               Player Profile Attributes
@@ -768,7 +768,7 @@ export default function IndividualPlayerDashboard({
             <Lock className="h-3.5 w-3.5 text-[#eab308]" />
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mb-2">
             <div>
               <span className="text-[#94a3b8] text-[10px] uppercase font-bold tracking-wider block">Primary Position</span>
               <span className="font-extrabold text-white text-sm mt-0.5 block">{position}</span>
@@ -807,7 +807,7 @@ export default function IndividualPlayerDashboard({
       </div>
 
       {/* 2. Top KPI Summary Cards (7 Cards) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
         <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-3.5 flex flex-col justify-between shadow-md">
           <span className="text-[10px] sm:text-[11px] font-extrabold text-[#94a3b8] uppercase tracking-wider block">Goals</span>
           <div className="text-2xl font-black text-[#eab308] mt-1">{goals}</div>
@@ -988,7 +988,7 @@ export default function IndividualPlayerDashboard({
                 {/* Metrics Items List */}
                 <div className="p-4 space-y-2 flex-1">
                   {card.items.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between py-1 border-b border-slate-800/40 last:border-0 text-xs">
+                    <div key={idx} className="flex flex-wrap md:flex-nowrap justify-between items-center py-1 border-b border-slate-800/40 last:border-0 text-xs gap-1">
                       <span className="text-slate-400 font-medium font-sans">
                         {item.label}
                       </span>
