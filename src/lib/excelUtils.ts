@@ -656,19 +656,36 @@ export const parsePlayerStatsExcel = async (file: File, matchIdOverride?: string
 
 
   if (sanitizedRows.length === 0) {
-    throw new Error("No valid player stat rows found in file.");
+    throw new Error("Excel file contains no valid rows.");
   }
+
+  // Pre-upsert diagnostic log — shows exactly what's being sent to Supabase
+  console.log(`Sending payload to player_stats (Count: ${sanitizedRows.length}):`, sanitizedRows);
 
   // Strict single-target upsert — public.player_stats ONLY, NO fallbacks
+  // .select() is required to get back the persisted rows (without it Supabase returns null)
   const { data: upsertData, error: statsErr } = await (supabase.from('player_stats') as any)
-    .upsert(sanitizedRows, { onConflict: 'id' });
+    .upsert(sanitizedRows, { onConflict: 'id' })
+    .select();
 
   if (statsErr) {
-    console.error("Player stats upsert error:", statsErr.message, statsErr);
-    throw new Error(`Failed to upload player stats: ${statsErr.message}`);
-  } else {
-    console.log("Player stats uploaded successfully!", upsertData);
+    console.error("Supabase Player Stats Upsert ERROR:", statsErr);
+    throw new Error(
+      `DB Save Failed: ${statsErr.message}` +
+      (statsErr.details ? ` | Details: ${statsErr.details}` : '') +
+      (statsErr.hint    ? ` | Hint: ${statsErr.hint}`    : '')
+    );
   }
+
+  if (!upsertData || upsertData.length === 0) {
+    console.warn("Upsert returned empty data array — likely an RLS policy is blocking inserts.", { sanitizedRows });
+    throw new Error(
+      "Failed to insert rows into public.player_stats. " +
+      "Upsert returned 0 rows — please check Row Level Security (RLS) policies and column permissions."
+    );
+  }
+
+  console.log(`SUCCESSFULLY SAVED ${upsertData.length} ROWS TO DB:`, upsertData);
 
   // Mirror to DataService local cache (camelCase interface)
   await DataService.savePlayerMatchRecords(sanitizedRows.map(r => ({
@@ -685,7 +702,7 @@ export const parsePlayerStatsExcel = async (file: File, matchIdOverride?: string
     ...r
   })));
 
-  return { count: sanitizedRows.length, data: sanitizedRows };
+  return { count: upsertData.length, data: upsertData };
 };
 
 export const handlePlayerExcelUpload = async (file: File) => {
