@@ -566,15 +566,7 @@ export const parsePlayerStatsExcel = async (file: File): Promise<{ count: number
     throw new Error("Excel file is empty or missing valid rows.");
   }
 
-  const { data: profiles } = await (supabase.from('profiles') as any).select('*');
-  const profileMap = new Map<string, any>();
-  if (profiles && Array.isArray(profiles)) {
-    profiles.forEach((p: any) => {
-      if (p.username) profileMap.set(String(p.username).trim().toLowerCase(), p);
-      if (p.full_name) profileMap.set(String(p.full_name).trim().toLowerCase(), p);
-    });
-  }
-
+  // Flexible header extraction helpers
   const extractString = (row: Record<string, any>, aliases: string[]): string => {
     const normAliases = aliases.map(a => a.toLowerCase().replace(/[^a-z0-9]/g, ""));
     for (const [key, val] of Object.entries(row)) {
@@ -595,107 +587,110 @@ export const parsePlayerStatsExcel = async (file: File): Promise<{ count: number
     return isNaN(parsed) ? defaultVal : parsed;
   };
 
+  // Build schema-exact payload for public.player_stats — NO extra/legacy columns
   const sanitizedRows = rawRows.map(row => {
-    const username = extractString(row, ['username', 'Username', 'User Name', 'player_name', 'Player Name', '선수명']);
-    const matchId = extractString(row, ['match_id', 'Match ID', 'Game ID', 'Match', '매치ID']) || 'M01';
-    
-    if (!username && !matchId) return null;
+    const playerName   = extractString(row, ['player_name', 'Player Name', 'Name', 'name', 'username', 'Username', '선수명']);
+    const matchId      = extractString(row, ['match_id', 'Match ID', 'Game ID', 'Match', '매치ID']) || 'M01';
 
-    const matchedProfile = profileMap.get(username.toLowerCase());
-    const playerId = matchedProfile?.player_id || matchedProfile?.id || matchedProfile?.user_id || `PLR-${username.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-    const playerName = matchedProfile?.full_name || username || 'Player';
+    if (!playerName && !matchId) return null;
 
-    const goals = extractInt(row, ['goals', 'Goals']);
-    const shots = extractInt(row, ['shots', 'Shots']);
-    const shotsOnTarget = extractInt(row, ['shots_on_target', 'Shots On Target', 'sot']);
+    const playerNumber  = extractInt(row, ['player_number', 'Number', 'Jersey', 'Shirt', '등번호']);
+    const position      = extractString(row, ['position', 'Position', 'Pos', '포지션']);
+    const minutesPlayed = extractInt(row, ['minutes_played', 'Minutes Played', 'Minutes', 'Mins', '출전시간']);
 
-    const passes = extractInt(row, ['passes', 'Passes', 'total_passes']);
-    const successfulPasses = extractInt(row, ['successful_passes', 'Successful Passes', 'completed_passes']);
-    const backwardsPasses = extractInt(row, ['backwards_passes', 'Backwards Passes', 'backward_passes']);
-    const forwardsPasses = extractInt(row, ['forwards_passes', 'Forwards Passes', 'forward_passes']);
-    const longPasses = extractInt(row, ['long_passes', 'Long Passes']);
+    // Scoring
+    const goals   = extractInt(row, ['goals', 'Goals', '득점']);
+    const assists = extractInt(row, ['assists', 'Assists', '도움']);
+
+    // Shooting
+    const shots         = extractInt(row, ['shots', 'Shots', '슈팅']);
+    const shotsOnTarget = extractInt(row, ['shots_on_target', 'Shots On Target', 'SOT', 'sot']);
+
+    // Passing — completed_passes is the primary schema column; successful_passes is accepted alias
+    const passes               = extractInt(row, ['passes', 'total_passes', 'Passes', 'Total Passes', '패스']);
+    const completedPasses      = extractInt(row, ['completed_passes', 'Completed Passes', 'successful_passes', 'Successful Passes']);
+    const keyPasses            = extractInt(row, ['key_passes', 'Key Passes']);
+    const successfulKeyPasses  = extractInt(row, ['successful_key_passes', 'Successful Key Passes']);
+    const longPasses           = extractInt(row, ['long_passes', 'Long Passes']);
     const successfulLongPasses = extractInt(row, ['successful_long_passes', 'Successful Long Passes']);
-    const keyPasses = extractInt(row, ['key_passes', 'Key Passes']);
-    const successfulKeyPasses = extractInt(row, ['successful_key_passes', 'Successful Key Passes']);
-    const throughBalls = extractInt(row, ['through_balls', 'Through Balls']);
+    const throughBalls         = extractInt(row, ['through_balls', 'Through Balls']);
     const successfulThroughBalls = extractInt(row, ['successful_through_balls', 'Successful Through Balls']);
-    const crosses = extractInt(row, ['crosses', 'Crosses']);
-    const successfulCrosses = extractInt(row, ['successful_crosses', 'Successful Crosses']);
+    const crosses              = extractInt(row, ['crosses', 'Crosses']);
+    const successfulCrosses    = extractInt(row, ['successful_crosses', 'Successful Crosses']);
 
-    const dribbles = extractInt(row, ['dribbles', 'Dribbles']);
+    // Dribbling & duels
+    const dribbles           = extractInt(row, ['dribbles', 'Dribbles']);
     const successfulDribbles = extractInt(row, ['successful_dribbles', 'Successful Dribbles']);
-    const duels = extractInt(row, ['duels', 'Duels']);
-    const duelsWon = extractInt(row, ['duels_won', 'Duels Won']);
-    const aerialDuels = extractInt(row, ['aerial_duels', 'Aerial Duels']);
-    const aerialDuelsWon = extractInt(row, ['aerial_duels_won', 'Aerial Duels Won']);
-    const groundDuels = extractInt(row, ['ground_duels', 'Ground Duels']);
-    const groundDuelsWon = extractInt(row, ['ground_duels_won', 'Ground Duels Won']);
+    const duels              = extractInt(row, ['duels', 'Duels']);
+    const duelsWon           = extractInt(row, ['duels_won', 'Duels Won']);
+    const aerialDuels        = extractInt(row, ['aerial_duels', 'Aerial Duels']);
+    const aerialDuelsWon     = extractInt(row, ['aerial_duels_won', 'Aerial Duels Won']);
+    const groundDuels        = extractInt(row, ['ground_duels', 'Ground Duels']);
+    const groundDuelsWon     = extractInt(row, ['ground_duels_won', 'Ground Duels Won']);
 
-    const tackles = extractInt(row, ['tackles', 'Tackles']);
-    const tacklesWon = extractInt(row, ['tackles_won', 'Tackles Won']);
+    // Defence
+    const tackles        = extractInt(row, ['tackles', 'Tackles']);
+    const tacklesWon     = extractInt(row, ['tackles_won', 'Tackles Won']);
+    const interceptions  = extractInt(row, ['interceptions', 'Interceptions']);
+    const clearances     = extractInt(row, ['clearances', 'Clearances']);
+    const blocks         = extractInt(row, ['blocks', 'Blocks']);
     const ballRecoveries = extractInt(row, ['ball_recoveries', 'Ball Recoveries', 'recoveries']);
-    const interceptions = extractInt(row, ['interceptions', 'Interceptions']);
-    const clearances = extractInt(row, ['clearances', 'Clearances']);
-    const blocks = extractInt(row, ['blocks', 'Blocks']);
 
-    const ownGoals = extractInt(row, ['own_goals', 'Own Goals']);
-    const turnovers = extractInt(row, ['turnovers', 'Turnovers']);
-    const miscontrols = extractInt(row, ['miscontrols', 'Miscontrols']);
-    const unsuccessfulDribbles = extractInt(row, ['unsuccessful_dribbles', 'Unsuccessful Dribbles']);
-    const possessionLost = extractInt(row, ['possession_lost', 'Possession Lost']);
-    const offsides = extractInt(row, ['offsides', 'Offsides']);
-    const fouls = extractInt(row, ['fouls', 'Fouls']);
+    // Discipline
+    const turnovers   = extractInt(row, ['turnovers', 'Turnovers']);
+    const fouls       = extractInt(row, ['fouls', 'Fouls']);
     const yellowCards = extractInt(row, ['yellow_cards', 'Yellow Cards']);
-    const redCards = extractInt(row, ['red_cards', 'Red Cards']);
+    const redCards    = extractInt(row, ['red_cards', 'Red Cards']);
 
-    const recId = `${matchId}_${username.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+    const recId = `${matchId}_${playerName.toLowerCase().replace(/[^a-z0-9]/g, '_') || playerNumber}`;
 
+    // Strictly schema-safe payload — exactly what public.player_stats accepts
     return {
-      id: recId,
-      match_id: matchId,
-      player_id: playerId,
-      player_name: playerName,
-      username: username,
+      id:             recId,
+      match_id:       matchId,
+      player_name:    playerName,
+      player_number:  playerNumber,
+      position:       position,
+      minutes_played: minutesPlayed,
+
       goals,
+      assists,
       shots,
-      shots_on_target: shotsOnTarget,
+      shots_on_target:  shotsOnTarget,
+
       passes,
-      total_passes: passes,
-      successful_passes: successfulPasses,
-      completed_passes: successfulPasses,
-      backwards_passes: backwardsPasses,
-      forwards_passes: forwardsPasses,
-      long_passes: longPasses,
-      successful_long_passes: successfulLongPasses,
-      key_passes: keyPasses,
-      successful_key_passes: successfulKeyPasses,
-      through_balls: throughBalls,
+      completed_passes:         completedPasses,
+      successful_passes:        completedPasses,
+      key_passes:               keyPasses,
+      successful_key_passes:    successfulKeyPasses,
+      long_passes:              longPasses,
+      successful_long_passes:   successfulLongPasses,
+      through_balls:            throughBalls,
       successful_through_balls: successfulThroughBalls,
       crosses,
-      successful_crosses: successfulCrosses,
+      successful_crosses:       successfulCrosses,
+
       dribbles,
-      successful_dribbles: successfulDribbles,
+      successful_dribbles:  successfulDribbles,
       duels,
-      duels_won: duelsWon,
-      aerial_duels: aerialDuels,
-      aerial_duels_won: aerialDuelsWon,
-      ground_duels: groundDuels,
-      ground_duels_won: groundDuelsWon,
+      duels_won:            duelsWon,
+      aerial_duels:         aerialDuels,
+      aerial_duels_won:     aerialDuelsWon,
+      ground_duels:         groundDuels,
+      ground_duels_won:     groundDuelsWon,
+
       tackles,
-      tackles_won: tacklesWon,
-      ball_recoveries: ballRecoveries,
+      tackles_won:     tacklesWon,
       interceptions,
       clearances,
       blocks,
-      own_goals: ownGoals,
+      ball_recoveries: ballRecoveries,
+
       turnovers,
-      miscontrols,
-      unsuccessful_dribbles: unsuccessfulDribbles,
-      possession_lost: possessionLost,
-      offsides,
       fouls,
       yellow_cards: yellowCards,
-      red_cards: redCards,
+      red_cards:    redCards,
+
       created_at: new Date().toISOString()
     };
   }).filter(Boolean) as any[];
@@ -704,35 +699,31 @@ export const parsePlayerStatsExcel = async (file: File): Promise<{ count: number
     throw new Error("No valid player stat rows found in file.");
   }
 
-  // Primary target: public.player_stats
-  const { error: statsErr } = await (supabase.from('player_stats') as any)
+  // Strict single-target upsert — public.player_stats ONLY, NO fallbacks
+  const { data: upsertData, error: statsErr } = await (supabase.from('player_stats') as any)
     .upsert(sanitizedRows, { onConflict: 'id' });
 
   if (statsErr) {
-    console.warn("Supabase player_stats upsert warning (falling back to match_logs):", statsErr.message);
-    const { error: logsErr } = await (supabase.from('match_logs') as any)
-      .upsert(sanitizedRows, { onConflict: 'id' });
-
-    if (logsErr) {
-      console.warn("Supabase match_logs upsert warning:", logsErr.message);
-    }
+    console.error("Player stats upsert error:", statsErr.message, statsErr);
+    throw new Error(`Failed to upload player stats: ${statsErr.message}`);
+  } else {
+    console.log("Player stats uploaded successfully!", upsertData);
   }
 
-  // Mirror to DataService
+  // Mirror to DataService local cache (camelCase interface)
   await DataService.savePlayerMatchRecords(sanitizedRows.map(r => ({
-    id: r.id,
-    matchId: r.match_id,
-    playerId: r.player_id,
-    playerName: r.player_name,
-    username: r.username,
-    goals: r.goals,
-    shots: r.shots,
-    shotsOnTarget: r.shots_on_target,
-    totalPasses: r.passes,
-    completedPasses: r.successful_passes,
-    tackles: r.tackles,
-    tacklesWon: r.tackles_won,
-    interceptions: r.interceptions,
+    id:              r.id,
+    matchId:         r.match_id,
+    playerName:      r.player_name,
+    goals:           r.goals,
+    assists:         r.assists,
+    shots:           r.shots,
+    shotsOnTarget:   r.shots_on_target,
+    totalPasses:     r.passes,
+    completedPasses: r.completed_passes,
+    tackles:         r.tackles,
+    tacklesWon:      r.tackles_won,
+    interceptions:   r.interceptions,
     ...r
   })));
 
