@@ -229,40 +229,53 @@ export default function IndividualPlayerDashboard({
       acc.shotsOnTarget += Number(row.shots_on_target || row.shotsOnTarget || 0);
       acc.totalPasses += Number(row.passes || row.total_passes || row.totalPasses || 0);
       acc.successfulPasses += Number(row.successful_passes || row.completed_passes || row.successfulPasses || 0);
-      acc.keyPasses += Number(row.key_passes || row.keyPasses || 0);
+      acc.backwardsPasses += Number(row.backwards_passes || row.backwardsPasses || row.backward_passes || 0);
+      acc.forwardsPasses += Number(row.forwards_passes || row.forwardsPasses || row.forward_passes || 0);
       acc.longPasses += Number(row.long_passes || row.longPasses || 0);
+      acc.successfulLongPasses += Number(row.successful_long_passes || row.successfulLongPasses || 0);
+      acc.keyPasses += Number(row.key_passes || row.keyPasses || 0);
+      acc.successfulKeyPasses += Number(row.successful_key_passes || row.successfulKeyPasses || 0);
       acc.throughBalls += Number(row.through_balls || row.throughBalls || 0);
+      acc.successfulThroughBalls += Number(row.successful_through_balls || row.successfulThroughBalls || 0);
       acc.crosses += Number(row.crosses || 0);
-      acc.successfulCrosses += Number(row.successful_crosses || 0);
+      acc.successfulCrosses += Number(row.successful_crosses || row.successfulCrosses || 0);
       acc.dribbles += Number(row.dribbles || 0);
-      acc.successfulDribbles += Number(row.successful_dribbles || 0);
+      acc.successfulDribbles += Number(row.successful_dribbles || row.successfulDribbles || 0);
       acc.duels += Number(row.duels || 0);
-      acc.duelsWon += Number(row.duels_won || 0);
-      acc.defensiveDuels += Number(row.ground_duels || row.defensiveDuels || row.duels || 0);
-      acc.defensiveDuelsWon += Number(row.ground_duels_won || row.defensiveDuelsWon || row.duels_won || 0);
-      acc.aerialDuels += Number(row.aerial_duels || 0);
-      acc.aerialDuelsWon += Number(row.aerial_duels_won || 0);
+      acc.duelsWon += Number(row.duels_won || row.duelsWon || 0);
+      acc.defensiveDuels += Number(row.ground_duels || row.defensiveDuels || row.groundDuels || 0);
+      acc.defensiveDuelsWon += Number(row.ground_duels_won || row.defensiveDuelsWon || row.groundDuelsWon || 0);
+      acc.aerialDuels += Number(row.aerial_duels || row.aerialDuels || 0);
+      acc.aerialDuelsWon += Number(row.aerial_duels_won || row.aerialDuelsWon || 0);
       acc.tackles += Number(row.tackles || 0);
-      acc.tacklesWon += Number(row.tackles_won || 0);
+      acc.tacklesWon += Number(row.tackles_won || row.tacklesWon || 0);
       acc.interceptions += Number(row.interceptions || 0);
       acc.clearances += Number(row.clearances || 0);
       acc.blocks += Number(row.blocks || 0);
-      acc.ballRecoveries += Number(row.ball_recoveries || 0);
+      acc.ballRecoveries += Number(row.ball_recoveries || row.ballRecoveries || 0);
+      acc.ownGoals += Number(row.own_goals || row.ownGoals || 0);
       acc.turnovers += Number(row.turnovers || 0);
+      acc.miscontrols += Number(row.miscontrols || row.miscontrol || 0);
+      acc.unsuccessfulDribbles += Number(row.unsuccessful_dribbles || row.unsuccessfulDribble || 0);
+      acc.possessionLost += Number(row.possession_lost || row.possessionLost || 0);
+      acc.offsides += Number(row.offsides || row.offside || 0);
       acc.fouls += Number(row.fouls || 0);
-      acc.yellowCards += Number(row.yellow_cards || 0);
-      acc.redCards += Number(row.red_cards || 0);
+      acc.yellowCards += Number(row.yellow_cards || row.yellowCards || 0);
+      acc.redCards += Number(row.red_cards || row.redCards || 0);
       acc.minutesPlayed += Number(row.minutes_played || row.minutesPlayed || 90);
       acc.appearances += 1;
       return acc;
     }, {
       goals: 0, assists: 0, shots: 0, shotsOnTarget: 0, totalPasses: 0,
-      successfulPasses: 0, keyPasses: 0, longPasses: 0, throughBalls: 0,
-      crosses: 0, successfulCrosses: 0, dribbles: 0, successfulDribbles: 0,
-      duels: 0, duelsWon: 0, defensiveDuels: 0, defensiveDuelsWon: 0,
-      aerialDuels: 0, aerialDuelsWon: 0, tackles: 0, tacklesWon: 0,
-      interceptions: 0, clearances: 0, blocks: 0, ballRecoveries: 0,
-      turnovers: 0, fouls: 0, yellowCards: 0, redCards: 0, minutesPlayed: 0, appearances: 0
+      successfulPasses: 0, backwardsPasses: 0, forwardsPasses: 0, longPasses: 0,
+      successfulLongPasses: 0, keyPasses: 0, successfulKeyPasses: 0, throughBalls: 0,
+      successfulThroughBalls: 0, crosses: 0, successfulCrosses: 0, dribbles: 0,
+      successfulDribbles: 0, duels: 0, duelsWon: 0, defensiveDuels: 0,
+      defensiveDuelsWon: 0, aerialDuels: 0, aerialDuelsWon: 0, tackles: 0,
+      tacklesWon: 0, interceptions: 0, clearances: 0, blocks: 0, ballRecoveries: 0,
+      ownGoals: 0, turnovers: 0, miscontrols: 0, unsuccessfulDribbles: 0,
+      possessionLost: 0, offsides: 0, fouls: 0, yellowCards: 0, redCards: 0,
+      minutesPlayed: 0, appearances: 0
     });
   }, [fetchedPlayerStats]);
 
@@ -333,10 +346,10 @@ export default function IndividualPlayerDashboard({
   const goals = safeVal(activePlayerObj.goals);
   const shots = safeVal(activePlayerObj.shots);
   const shotsOnTarget = safeVal(activePlayerObj.shotsOnTarget || (activePlayerObj as any).shots_on_target);
-  const passes = safeVal(activePlayerObj.totalPasses || (activePlayerObj as any).passes);
-  const successfulPasses = safeVal(activePlayerObj.successfulPasses || (activePlayerObj as any).successful_passes);
-  const backwardsPasses = safeVal((activePlayerObj as any).backwards_passes || (activePlayerObj as any).backwardPasses);
-  const forwardsPasses = safeVal((activePlayerObj as any).forwards_passes || (activePlayerObj as any).forwardPasses);
+  const passes = safeVal(activePlayerObj.totalPasses || (activePlayerObj as any).passes || (activePlayerObj as any).total_passes);
+  const successfulPasses = safeVal(activePlayerObj.successfulPasses || (activePlayerObj as any).successful_passes || (activePlayerObj as any).completed_passes);
+  const backwardsPasses = safeVal((activePlayerObj as any).backwardsPasses || (activePlayerObj as any).backwards_passes || (activePlayerObj as any).backwardPasses);
+  const forwardsPasses = safeVal((activePlayerObj as any).forwardsPasses || (activePlayerObj as any).forwards_passes || (activePlayerObj as any).forwardPasses);
   const longPasses = safeVal((activePlayerObj as any).longPasses || (activePlayerObj as any).long_passes);
   const successfulLongPasses = safeVal((activePlayerObj as any).successfulLongPasses || (activePlayerObj as any).successful_long_passes);
   const keyPasses = safeVal(activePlayerObj.keyPasses || (activePlayerObj as any).key_passes);
@@ -351,23 +364,23 @@ export default function IndividualPlayerDashboard({
   const duelsWon = safeVal((activePlayerObj as any).duelsWon || (activePlayerObj as any).duels_won);
   const aerialDuels = safeVal(activePlayerObj.aerialDuels || (activePlayerObj as any).aerial_duels);
   const aerialDuelsWon = safeVal(activePlayerObj.aerialDuelsWon || (activePlayerObj as any).aerial_duels_won);
-  const groundDuels = safeVal(activePlayerObj.defensiveDuels || (activePlayerObj as any).ground_duels);
-  const groundDuelsWon = safeVal(activePlayerObj.defensiveDuelsWon || (activePlayerObj as any).ground_duels_won);
+  const groundDuels = safeVal((activePlayerObj as any).groundDuels || (activePlayerObj as any).ground_duels || activePlayerObj.defensiveDuels);
+  const groundDuelsWon = safeVal((activePlayerObj as any).groundDuelsWon || (activePlayerObj as any).ground_duels_won || activePlayerObj.defensiveDuelsWon);
   const ballRecoveries = safeVal(activePlayerObj.ballRecoveries || (activePlayerObj as any).ball_recoveries);
   const tackles = safeVal((activePlayerObj as any).tackles);
   const tacklesWon = safeVal((activePlayerObj as any).tacklesWon || (activePlayerObj as any).tackles_won);
-  const interceptions = safeVal(activePlayerObj.interceptions);
-  const clearances = safeVal(activePlayerObj.clearances);
+  const interceptions = safeVal(activePlayerObj.interceptions || (activePlayerObj as any).interceptions);
+  const clearances = safeVal(activePlayerObj.clearances || (activePlayerObj as any).clearances);
   const blocks = safeVal((activePlayerObj as any).blocks);
-  const ownGoals = safeVal((activePlayerObj as any).own_goals || (activePlayerObj as any).ownGoals);
+  const ownGoals = safeVal((activePlayerObj as any).ownGoals || (activePlayerObj as any).own_goals);
   const turnovers = safeVal((activePlayerObj as any).turnovers);
   const miscontrols = safeVal((activePlayerObj as any).miscontrols || (activePlayerObj as any).miscontrol);
-  const unsuccessfulDribbles = safeVal((activePlayerObj as any).unsuccessful_dribbles || (activePlayerObj as any).unsuccessfulDribble);
-  const possessionLost = safeVal((activePlayerObj as any).possession_lost || (activePlayerObj as any).possessionLost);
+  const unsuccessfulDribbles = safeVal((activePlayerObj as any).unsuccessfulDribbles || (activePlayerObj as any).unsuccessful_dribbles || (activePlayerObj as any).unsuccessfulDribble);
+  const possessionLost = safeVal((activePlayerObj as any).possessionLost || (activePlayerObj as any).possession_lost);
   const offsides = safeVal((activePlayerObj as any).offsides || (activePlayerObj as any).offside);
   const fouls = safeVal((activePlayerObj as any).fouls);
-  const yellowCards = safeVal((activePlayerObj as any).yellow_cards || (activePlayerObj as any).yellowCards);
-  const redCards = safeVal((activePlayerObj as any).red_cards || (activePlayerObj as any).redCards);
+  const yellowCards = safeVal((activePlayerObj as any).yellowCards || (activePlayerObj as any).yellow_cards);
+  const redCards = safeVal((activePlayerObj as any).redCards || (activePlayerObj as any).red_cards);
 
   // Key KPI accuracy formulas
   const passAcc = safeDivPct(successfulPasses, passes);
