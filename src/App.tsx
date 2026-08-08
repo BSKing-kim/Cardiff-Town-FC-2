@@ -160,8 +160,9 @@ export default function App() {
         DataService.logout();
         setCurrentUser(null);
       } else {
+        const isStaff = ['Admin', 'Head Coach', 'Manager', 'admin', 'coach', 'Analyst'].includes(user.role || '') || user.isAdmin || (user as any)?.is_admin;
         setCurrentUser(user);
-        setActiveTab("my-performance");
+        setActiveTab(isStaff ? "match-hub" : "my-performance");
       }
     }
 
@@ -201,7 +202,7 @@ export default function App() {
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, [currentUser]);
 
-  const isStaffUser = currentUser?.role !== UserRole.Player || !!currentUser?.isAdmin;
+  const isStaffUser = ['Admin', 'Head Coach', 'Manager', 'admin', 'coach', 'Analyst'].includes(currentUser?.role || '') || currentUser?.isAdmin || (currentUser as any)?.is_admin;
 
   useEffect(() => {
     if (!currentUser) return;
@@ -215,15 +216,16 @@ export default function App() {
   }, [activeTab, selectedOpponent, currentUser]);
 
   const handleLoginSuccess = (user: UserProfile) => {
+    const isStaff = ['Admin', 'Head Coach', 'Manager', 'admin', 'coach', 'Analyst'].includes(user.role || '') || user.isAdmin || (user as any)?.is_admin;
     setCurrentUser(user);
-    setActiveTab("my-performance");
+    setActiveTab(isStaff ? "match-hub" : "my-performance");
     loadStatsData();
   };
 
   const handleLogout = () => {
     DataService.logout();
     setCurrentUser(null);
-    setActiveTab("my-performance");
+    setActiveTab("match-hub");
     if (window.location.hash) {
       window.location.hash = "";
     }
@@ -395,12 +397,6 @@ export default function App() {
             {isStaffUser ? (
               <>
                 <DrawerButton 
-                  active={activeTab === "my-performance"}
-                  onClick={() => { setActiveTab("my-performance"); setDrawerOpen(false); }}
-                  icon={UserCheck}
-                  label="My Performance"
-                />
-                <DrawerButton 
                   active={activeTab === "match-hub" || activeTab === "team"}
                   onClick={() => { setActiveTab("match-hub"); setDrawerOpen(false); }}
                   icon={TrendingUp}
@@ -561,7 +557,11 @@ export default function App() {
               
               {/* View routing */}
               {activeTab === "my-performance" && (
-                <MyPerformance currentUser={currentUser} players={players} matches={matches} />
+                !isStaffUser ? (
+                  <MyPerformance currentUser={currentUser} players={players} matches={matches} />
+                ) : (
+                  <MatchHub matches={matches} currentUser={currentUser} onSelectOpponent={handleSelectOpponent} />
+                )
               )}
 
               {activeTab === "match-hub" && (
