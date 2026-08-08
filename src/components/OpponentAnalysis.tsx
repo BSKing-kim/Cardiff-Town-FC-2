@@ -337,7 +337,7 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
   // Render 1: League standings & team checklist selection
   if (activeSubView === "standings") {
     return (
-      <div className="space-y-6 animate-fadeIn" id="opponent-analysis-standings">
+      <div className="space-y-6 animate-fadeIn w-full max-w-full overflow-hidden" id="opponent-analysis-standings">
         {/* Header Block */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 pb-4">
           <div>
@@ -362,7 +362,7 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
         </div>
 
         {/* Dynamic Standing / Team List Table */}
-        <div className="rounded-xl border border-slate-800 bg-[#0f172a] overflow-hidden shadow-xl">
+        <div className="rounded-xl border border-slate-800 bg-[#0f172a] overflow-hidden shadow-xl w-full max-w-full">
           <div className="bg-slate-900 border-b border-slate-800 px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-1.5">
               <Trophy className="h-4.5 w-4.5 text-amber-400" />
@@ -394,7 +394,82 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Mobile Stacked Card View */}
+          <div className="md:hidden divide-y divide-slate-800/80 text-xs font-sans text-slate-300">
+            {standings.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 font-sans text-xs">
+                <div className="flex flex-col items-center justify-center gap-2 max-w-md mx-auto p-4">
+                  <Shield className="w-8 h-8 text-slate-600 mb-1" />
+                  <span className="font-semibold text-slate-300">No teams registered for this division yet.</span>
+                  <span className="text-slate-400 text-[11px]">Upload the League Teams template to build standings.</span>
+                </div>
+              </div>
+            ) : (
+              standings.map((team) => {
+                const isOurTeam = team.name === "Cardiff Town FC";
+                const isChecked = selectedCompareTeams.includes(team.name);
+                const matchCount = isOurTeam 
+                  ? ourMatches.length 
+                  : matches.filter(m => m.opponent === team.name && m.isOpponentTeam).length;
+
+                return (
+                  <div
+                    key={team.name}
+                    className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 gap-3 transition-all ${
+                      isOurTeam ? "bg-cyan-950/30" : ""
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => handleCheckboxChange(team.name)}
+                        className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-500 cursor-pointer shrink-0"
+                      />
+                      <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
+                        <span className={`font-semibold text-sm truncate max-w-[180px] sm:max-w-none ${isOurTeam ? "text-cyan-400 font-bold" : "text-white"}`}>
+                          {team.name}
+                        </span>
+                        {isOurTeam && (
+                          <span className="text-[9px] bg-cyan-950 text-cyan-400 border border-cyan-800 px-1.5 py-0.2 rounded font-semibold font-mono uppercase tracking-wider">
+                            Our Club
+                          </span>
+                        )}
+                        {matchCount > 0 && (
+                          <span className="text-[9px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-1.5 py-0.2 rounded font-semibold font-mono">
+                            {matchCount} Stats
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 w-full sm:w-auto shrink-0 border-t border-slate-800/60 sm:border-t-0 pt-2 sm:pt-0">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDetailedStats(team.name)}
+                        className="px-3 py-1.5 text-xs font-bold rounded-lg text-cyan-400 hover:bg-cyan-950/60 border border-cyan-800 transition-all cursor-pointer"
+                      >
+                        View
+                      </button>
+                      {!isOurTeam && (
+                        <button
+                          type="button"
+                          onClick={() => handleInstantCompareWithUs(team.name)}
+                          className="px-3 py-1.5 text-xs font-bold rounded-lg text-slate-200 hover:bg-slate-800 border border-slate-700 transition-all cursor-pointer inline-flex items-center gap-1"
+                        >
+                          <ArrowRightLeft className="h-3 w-3 text-slate-400" />
+                          <span>vs Us</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto w-full">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-800 bg-slate-950 text-[10px] uppercase tracking-wider text-slate-400 font-bold font-sans">

@@ -1479,14 +1479,14 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
         const rightHeaderScore = analysisData?.awayData?.goals ?? (selectedAnalysisFixture as any).goals ?? (selectedAnalysisFixture as any).our_score ?? awayScoreVal;
 
         return (
-          <div id="match-analysis-modal-overlay" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
-            <div className={`bg-white rounded-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 flex flex-col transition-all duration-300 ${activeAnalysisTab === "heatmap" ? "max-w-4xl" : "max-w-7xl w-[92vw]"}`}>
+          <div id="match-analysis-modal-overlay" className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+            <div className={`bg-white rounded-2xl w-full max-w-[95vw] max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 flex flex-col transition-all duration-300 ${activeAnalysisTab === "heatmap" ? "md:max-w-4xl" : "md:max-w-7xl"}`}>
               
               {/* Modal Header */}
-              <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-2xl">
+              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-2xl">
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block mb-1">Match Statistics Analysis</span>
-                  <h3 className="font-display font-extrabold text-slate-800 text-base flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block mb-0.5">Match Statistics Analysis</span>
+                  <h3 className="font-display font-extrabold text-slate-800 text-sm sm:text-base flex items-center gap-2">
                     <TrendingUp className="h-4.5 w-4.5 text-[#1D4ED8]" />
                     {selectedAnalysisFixture.competition} Match Comparison
                   </h3>
@@ -1520,30 +1520,30 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
               </div>
 
               {/* Match Summary Display (Teams and Logo) */}
-              <div className="p-5 bg-[#0A2342] text-white flex flex-col items-center justify-center gap-2 text-center shadow-inner relative overflow-hidden">
+              <div className="p-4 sm:p-5 bg-[#0A2342] text-white flex flex-col items-center justify-center gap-2 text-center shadow-inner relative overflow-hidden">
                 <div className="absolute inset-0 bg-radial from-transparent to-black/30 opacity-60" />
                 
                 <span className="text-[10px] font-bold tracking-widest text-[#D4AF37] uppercase font-mono relative z-10">
                   {selectedAnalysisFixture.date}
                 </span>
 
-                <div className="flex items-center justify-center gap-6 w-full relative z-10 my-1">
-                  <div className="flex flex-col items-center gap-1.5 w-1/3">
-                    <TeamLogo teamName={hTeam} size={42} className="bg-white/10 rounded-lg p-1 border border-white/20" />
-                    <span className="text-xs sm:text-sm font-extrabold truncate w-full" title={hTeam}>{hTeam}</span>
-                    <span className="text-[9px] text-slate-300 font-bold tracking-wider uppercase">HOME</span>
+                <div className="flex flex-row items-center justify-between w-full px-1 sm:px-2 py-2 sm:py-4 relative z-10 my-1">
+                  <div className="flex flex-col items-center w-1/3 min-w-0">
+                    <TeamLogo teamName={hTeam} size={38} className="bg-white/10 rounded-lg p-1 border border-white/20 shrink-0" />
+                    <span className="text-xs sm:text-sm font-extrabold text-center mt-1 break-words w-full line-clamp-2" title={hTeam}>{hTeam}</span>
+                    <span className="text-[9px] text-slate-300 font-bold tracking-wider uppercase mt-0.5">HOME</span>
                   </div>
 
-                  <div className="flex flex-col items-center justify-center gap-1">
-                    <div className="text-2xl sm:text-3xl font-black font-mono tracking-tight bg-white/10 px-4 py-1.5 rounded-xl border border-white/10">
+                  <div className="flex flex-col items-center justify-center w-1/3 px-1 sm:px-2 shrink-0">
+                    <div className="text-lg sm:text-3xl font-black font-mono tracking-tight bg-white/10 px-2 sm:px-4 py-1 sm:py-1.5 rounded-xl border border-white/10 whitespace-nowrap">
                       {leftHeaderScore} : {rightHeaderScore}
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-center gap-1.5 w-1/3">
-                    <TeamLogo teamName={aTeam} size={42} className="bg-white/10 rounded-lg p-1 border border-white/20" />
-                    <span className="text-xs sm:text-sm font-extrabold truncate w-full" title={aTeam}>{aTeam}</span>
-                    <span className="text-[9px] text-slate-300 font-bold tracking-wider uppercase">AWAY</span>
+                  <div className="flex flex-col items-center w-1/3 min-w-0">
+                    <TeamLogo teamName={aTeam} size={38} className="bg-white/10 rounded-lg p-1 border border-white/20 shrink-0" />
+                    <span className="text-xs sm:text-sm font-extrabold text-center mt-1 break-words w-full line-clamp-2" title={aTeam}>{aTeam}</span>
+                    <span className="text-[9px] text-slate-300 font-bold tracking-wider uppercase mt-0.5">AWAY</span>
                   </div>
                 </div>
               </div>
