@@ -109,28 +109,38 @@ export default function MyPerformance({ currentUser, players = [], matches = [] 
           setAssignedPlayerId(profilePlayerId);
         }
 
-        if (profilePlayerId) {
-          // Direct indexed fetch from match_logs using player_id
-          const { data: logs, error } = await (supabase.from('match_logs') as any)
-            .select('*')
-            .eq('player_id', profilePlayerId);
+        const uName = currentUser?.username;
+        const pId = profilePlayerId || targetUserId || currentUser?.id;
+        const fName = profileName || (currentUser ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() : '');
 
-          if (isMounted) {
-            if (!error && logs && logs.length > 0) {
-              setMyLogs(logs);
-            } else {
-              // Fallback search by player_name if initial player_id returns empty
-              const { data: nameLogs } = await (supabase.from('match_logs') as any)
-                .select('*')
-                .ilike('player_name', `%${profileName}%`);
-              if (nameLogs) setMyLogs(nameLogs);
+        let conditions: string[] = [];
+        if (pId) {
+          conditions.push(`player_id.eq.${pId}`, `user_id.eq.${pId}`, `id.eq.${pId}`);
+        }
+        if (uName) {
+          conditions.push(`username.eq.${uName}`);
+        }
+        if (fName) {
+          conditions.push(`player_name.eq.${fName}`, `name.eq.${fName}`);
+        }
+
+        if (conditions.length > 0) {
+          // Query public.player_stats with flexible OR condition for instant matching
+          const { data: statsData } = await (supabase.from('player_stats') as any)
+            .select('*')
+            .or(conditions.join(','));
+
+          if (isMounted && Array.isArray(statsData) && statsData.length > 0) {
+            setMyLogs(statsData);
+          } else {
+            // Fallback search in match_logs
+            const { data: matchLogs } = await (supabase.from('match_logs') as any)
+              .select('*')
+              .or(conditions.join(','));
+            if (isMounted && Array.isArray(matchLogs)) {
+              setMyLogs(matchLogs);
             }
           }
-        } else if (profileName) {
-          const { data: nameLogs } = await (supabase.from('match_logs') as any)
-            .select('*')
-            .ilike('player_name', `%${profileName}%`);
-          if (isMounted && nameLogs) setMyLogs(nameLogs);
         }
       } catch (err) {
         console.warn("Error loading my performance:", err);

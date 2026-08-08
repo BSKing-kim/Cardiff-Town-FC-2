@@ -566,6 +566,20 @@ export const parsePlayerStatsExcel = async (file: File, matchIdOverride?: string
     throw new Error("Excel file is empty or missing valid rows.");
   }
 
+  // Fetch registered roster/profiles for automatic player ID & user ID mapping
+  let profilesData: any[] = [];
+  let playersData: any[] = [];
+  try {
+    const [{ data: profs }, { data: plrs }] = await Promise.all([
+      (supabase.from('profiles') as any).select('*'),
+      (supabase.from('players') as any).select('*')
+    ]);
+    if (Array.isArray(profs)) profilesData = profs;
+    if (Array.isArray(plrs)) playersData = plrs;
+  } catch (e) {
+    console.warn("Could not pre-fetch profiles/players for player matching:", e);
+  }
+
   // Flexible header extraction helpers
   const extractString = (row: Record<string, any>, aliases: string[]): string => {
     const normAliases = aliases.map(a => a.toLowerCase().replace(/[^a-z0-9]/g, ""));
@@ -589,26 +603,55 @@ export const parsePlayerStatsExcel = async (file: File, matchIdOverride?: string
 
   // Build schema-exact payload for public.player_stats — ONLY columns confirmed to exist in the table
   const sanitizedRows = rawRows.map(row => {
-    const playerName   = extractString(row, ['player_name', 'Player Name', 'Name', 'name', 'username', 'Username', '선수명']);
+    const extractedName = extractString(row, ['player_name', 'Player Name', 'Name', 'name', 'username', 'Username', '선수명']);
     // matchIdOverride from the match-selector takes precedence over the row's own match_id
     const rowMatchId   = extractString(row, ['match_id', 'Match ID', 'Game ID', 'Match', '매치ID']) || 'M01';
     const matchId      = (matchIdOverride && matchIdOverride.trim()) ? matchIdOverride.trim() : rowMatchId;
 
-    if (!playerName && !matchId) return null;
+    if (!extractedName && !matchId) return null;
 
-    const pNum = Number(extractInt(row, ['player_number', 'Number', 'Jersey', 'Shirt', '등번호'])) || 0;
+    const pNum = Number(extractInt(row, ['player_number', 'Number', 'Jersey', 'Shirt', '등번호', 'shirt_number', 'squad_number'])) || 0;
+    const targetNameNorm = extractedName.trim().toLowerCase();
 
-    // Sanitize every field as Number to prevent type errors or schema mismatches
-    // Dual player_name / name mapping — Supabase accepts whichever column exists
-    const nameVal = String(playerName).trim();
+    // Automatic player matching logic
+    const matchedProfile = profilesData.find((p: any) => {
+      const uName = String(p.username || '').trim().toLowerCase();
+      const fName = String(p.full_name || p.name || '').trim().toLowerCase();
+      const pNo = Number(p.player_number || p.squad_number || p.jersey_number || p.shirt_number || p.number || 0);
+
+      return (
+        (uName && targetNameNorm && uName === targetNameNorm) ||
+        (fName && targetNameNorm && fName === targetNameNorm) ||
+        (pNo > 0 && pNum > 0 && pNo === pNum)
+      );
+    });
+
+    const matchedPlayerObj = !matchedProfile ? playersData.find((p: any) => {
+      const pName = String(p.name || p.full_name || '').trim().toLowerCase();
+      const pNo = Number(p.jersey_number || p.number || p.player_number || 0);
+
+      return (
+        (pName && targetNameNorm && pName === targetNameNorm) ||
+        (pNo > 0 && pNum > 0 && pNo === pNum)
+      );
+    }) : null;
+
+    const resolvedPlayerId = matchedProfile?.player_id || matchedProfile?.id || matchedPlayerObj?.id || null;
+    const resolvedUserId   = matchedProfile?.user_id || matchedProfile?.id || null;
+    const resolvedUsername = matchedProfile?.username || extractedName;
+    const resolvedPlayerName = matchedProfile?.full_name || matchedPlayerObj?.name || extractedName;
+
     const cleanPayload = {
-      // PK: selectedMatchId_playerNumber (or playerName as fallback)
-      id:             `${matchId}_${pNum || nameVal.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+      // PK: selectedMatchId_playerId (or pNum / extractedName fallback)
+      id:             `${matchId}_${resolvedPlayerId || pNum || targetNameNorm.replace(/[^a-z0-9]/g, '_')}`,
       match_id:       matchId,
-      player_name:    nameVal,           // primary column name
-      name:           nameVal,           // dual fallback for schema compatibility
-      player_number:  Number(extractInt(row, ['player_number', 'Number', 'Jersey', 'Shirt', '등번호'])) || 0,
-      position:       String(extractString(row, ['position', 'Position', 'Pos', '포지션'])).trim(),
+      player_id:      resolvedPlayerId,
+      user_id:        resolvedUserId,
+      username:       resolvedUsername,
+      player_name:    resolvedPlayerName,
+      name:           extractedName,
+      player_number:  pNum || Number(matchedProfile?.player_number || matchedProfile?.squad_number || matchedPlayerObj?.jersey_number || 0),
+      position:       String(extractString(row, ['position', 'Position', 'Pos', '포지션']) || matchedProfile?.position || matchedPlayerObj?.position || '').trim(),
       minutes_played: Number(extractInt(row, ['minutes_played', 'Minutes Played', 'Minutes', 'Mins', '출전시간'])) || 0,
 
       // Scoring

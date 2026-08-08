@@ -1412,6 +1412,35 @@ export class DataService {
         });
       }
 
+      // 3. Query player_stats table
+      const { data: psData, error: psError } = await (supabase.from("player_stats") as any).select("*");
+      if (!psError && Array.isArray(psData)) {
+        psData.forEach((r: any) => {
+          const key = r.id || `${r.match_id}_${r.player_id || r.user_id || r.player_name || r.name}`;
+          if (!recordMap.has(key)) {
+            recordMap.set(key, {
+              id: key,
+              matchId: r.match_id,
+              playerId: r.player_id || r.user_id,
+              playerName: r.player_name || r.name,
+              position: r.position || "CM",
+              minutesPlayed: r.minutes_played || 90,
+              goals: r.goals || 0,
+              assists: r.assists || 0,
+              shots: r.shots || 0,
+              shotsOnTarget: r.shots_on_target || 0,
+              totalPasses: r.passes || r.total_passes || 0,
+              completedPasses: r.successful_passes || r.completed_passes || 0,
+              tackles: r.tackles || 0,
+              tacklesWon: r.tackles_won || 0,
+              interceptions: r.interceptions || 0,
+              clearances: r.clearances || 0,
+              blocks: r.blocks || 0
+            });
+          }
+        });
+      }
+
       if (recordMap.size > 0) {
         const records = Array.from(recordMap.values());
         localStorage.setItem("team_perf_analyzer_player_match_records", JSON.stringify(records));

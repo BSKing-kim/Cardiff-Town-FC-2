@@ -102,19 +102,98 @@ export default function IndividualPlayerDashboard({
     fetchProfileAndPendingRequests();
   }, [currentUser]);
 
+  const [fetchedPlayerStats, setFetchedPlayerStats] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadPlayerStatsFromDb = async () => {
+      const pId = player?.id || (currentUser as any)?.playerId || (currentUser as any)?.player_id || currentUser?.id;
+      const uName = (player as any)?.username || currentUser?.username;
+      const pName = player?.name || (player as any)?.full_name || (currentUser ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() : '');
+
+      let conditions: string[] = [];
+      if (pId) conditions.push(`player_id.eq.${pId}`, `user_id.eq.${pId}`, `id.eq.${pId}`);
+      if (uName) conditions.push(`username.eq.${uName}`);
+      if (pName) conditions.push(`player_name.eq.${pName}`, `name.eq.${pName}`);
+
+      if (conditions.length > 0) {
+        try {
+          const { data } = await (supabase.from('player_stats') as any)
+            .select('*')
+            .or(conditions.join(','));
+
+          if (Array.isArray(data) && data.length > 0) {
+            setFetchedPlayerStats(data);
+          } else {
+            const { data: mlData } = await (supabase.from('match_logs') as any)
+              .select('*')
+              .or(conditions.join(','));
+            if (Array.isArray(mlData)) setFetchedPlayerStats(mlData);
+          }
+        } catch (e) {
+          console.warn("Could not fetch player_stats in dashboard:", e);
+        }
+      }
+    };
+
+    loadPlayerStatsFromDb();
+  }, [player, currentUser]);
+
+  const aggregatedStats = useMemo(() => {
+    if (!fetchedPlayerStats || fetchedPlayerStats.length === 0) return null;
+    
+    return fetchedPlayerStats.reduce((acc, row) => {
+      acc.goals += Number(row.goals || 0);
+      acc.assists += Number(row.assists || 0);
+      acc.shots += Number(row.shots || 0);
+      acc.shotsOnTarget += Number(row.shots_on_target || row.shotsOnTarget || 0);
+      acc.totalPasses += Number(row.passes || row.total_passes || row.totalPasses || 0);
+      acc.successfulPasses += Number(row.successful_passes || row.completed_passes || row.successfulPasses || 0);
+      acc.keyPasses += Number(row.key_passes || row.keyPasses || 0);
+      acc.longPasses += Number(row.long_passes || row.longPasses || 0);
+      acc.throughBalls += Number(row.through_balls || row.throughBalls || 0);
+      acc.crosses += Number(row.crosses || 0);
+      acc.successfulCrosses += Number(row.successful_crosses || 0);
+      acc.dribbles += Number(row.dribbles || 0);
+      acc.successfulDribbles += Number(row.successful_dribbles || 0);
+      acc.duels += Number(row.duels || 0);
+      acc.duelsWon += Number(row.duels_won || 0);
+      acc.defensiveDuels += Number(row.ground_duels || row.defensiveDuels || row.duels || 0);
+      acc.defensiveDuelsWon += Number(row.ground_duels_won || row.defensiveDuelsWon || row.duels_won || 0);
+      acc.aerialDuels += Number(row.aerial_duels || 0);
+      acc.aerialDuelsWon += Number(row.aerial_duels_won || 0);
+      acc.tackles += Number(row.tackles || 0);
+      acc.tacklesWon += Number(row.tackles_won || 0);
+      acc.interceptions += Number(row.interceptions || 0);
+      acc.clearances += Number(row.clearances || 0);
+      acc.blocks += Number(row.blocks || 0);
+      acc.ballRecoveries += Number(row.ball_recoveries || 0);
+      acc.turnovers += Number(row.turnovers || 0);
+      acc.fouls += Number(row.fouls || 0);
+      acc.yellowCards += Number(row.yellow_cards || 0);
+      acc.redCards += Number(row.red_cards || 0);
+      acc.minutesPlayed += Number(row.minutes_played || row.minutesPlayed || 90);
+      acc.appearances += 1;
+      return acc;
+    }, {
+      goals: 0, assists: 0, shots: 0, shotsOnTarget: 0, totalPasses: 0,
+      successfulPasses: 0, keyPasses: 0, longPasses: 0, throughBalls: 0,
+      crosses: 0, successfulCrosses: 0, dribbles: 0, successfulDribbles: 0,
+      duels: 0, duelsWon: 0, defensiveDuels: 0, defensiveDuelsWon: 0,
+      aerialDuels: 0, aerialDuelsWon: 0, tackles: 0, tacklesWon: 0,
+      interceptions: 0, clearances: 0, blocks: 0, ballRecoveries: 0,
+      turnovers: 0, fouls: 0, yellowCards: 0, redCards: 0, minutesPlayed: 0, appearances: 0
+    });
+  }, [fetchedPlayerStats]);
+
   // Fallback player object if unmatched or null
   const activePlayerObj: Player = useMemo(() => {
-    if (player && !isUnmatched) return player;
-
-    const nameDisplay = currentUser
-      ? (currentUser.firstName && currentUser.lastName
-          ? `${currentUser.firstName} ${currentUser.lastName}`
-          : currentUser.username || "Registered User")
-      : "Guest User";
-
-    return {
+    const baseObj = (player && !isUnmatched) ? player : {
       id: "unlinked-profile",
-      name: nameDisplay,
+      name: currentUser
+        ? (currentUser.firstName && currentUser.lastName
+            ? `${currentUser.firstName} ${currentUser.lastName}`
+            : currentUser.username || "Registered User")
+        : "Guest User",
       position: "Pending",
       backNumber: "-",
       preferredFoot: "-",
@@ -123,6 +202,8 @@ export default function IndividualPlayerDashboard({
       appearances: 0,
       totalPasses: 0,
       successfulPasses: 0,
+      keyPasses: 0,
+      touches: 0,
       defensiveDuels: 0,
       defensiveDuelsWon: 0,
       shots: 0,
@@ -130,7 +211,24 @@ export default function IndividualPlayerDashboard({
       goals: 0,
       assists: 0
     };
-  }, [player, currentUser, isUnmatched]);
+
+    if (aggregatedStats) {
+      return {
+        ...baseObj,
+        ...aggregatedStats,
+        goals: baseObj.goals || aggregatedStats.goals,
+        assists: baseObj.assists || aggregatedStats.assists,
+        shots: baseObj.shots || aggregatedStats.shots,
+        shotsOnTarget: baseObj.shotsOnTarget || aggregatedStats.shotsOnTarget,
+        totalPasses: baseObj.totalPasses || aggregatedStats.totalPasses,
+        successfulPasses: baseObj.successfulPasses || aggregatedStats.successfulPasses,
+        minutesPlayed: baseObj.minutesPlayed || aggregatedStats.minutesPlayed,
+        appearances: baseObj.appearances || aggregatedStats.appearances
+      } as unknown as Player;
+    }
+
+    return baseObj as unknown as Player;
+  }, [player, currentUser, isUnmatched, aggregatedStats]);
 
   // Safe value extraction & percentage formula helpers
   const safeVal = (v: any) => {
