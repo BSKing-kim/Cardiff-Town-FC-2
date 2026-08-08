@@ -546,24 +546,24 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
 
     return (
       <div className="space-y-6 animate-fadeIn" id="opponent-detailed-stats-view">
-        {/* Breadcrumb Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-[#E2E8F0] pb-4">
+        {/* Navigation Breadcrumb */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-800 pb-4">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setActiveSubView("standings")}
-              className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              className="p-1.5 hover:bg-gray-800 rounded-lg transition-colors cursor-pointer text-cyan-400 hover:text-white"
               title="Return to standings"
             >
-              <ArrowLeft className="h-5 w-5 text-[#0A2342]" />
+              <ArrowLeft className="h-5 w-5" />
             </button>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] bg-slate-100 border border-slate-200 px-2 py-0.5 rounded uppercase font-bold text-slate-500 font-mono">
+                <span className="text-[10px] bg-gray-800 border border-gray-700 px-2 py-0.5 rounded uppercase font-bold text-gray-300 font-mono">
                   Scouting Profile
                 </span>
-                <span className="text-xs text-slate-400 font-bold">CCFL {LEAGUES[activeLeagueIdx]}</span>
+                <span className="text-xs text-gray-400 font-bold">CCFL {LEAGUES[activeLeagueIdx]}</span>
               </div>
-              <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-[#0A2342] mt-0.5">
+              <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-white mt-0.5">
                 {selectedOpponentName} Statistics
               </h2>
             </div>
@@ -576,18 +576,18 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
               disabled={isMobile}
               className={`inline-flex items-center gap-1.5 rounded px-3 py-1.8 text-xs font-bold border cursor-pointer transition-colors shadow-xs ${
                 isMobile
-                  ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-50"
-                  : "bg-[#0A2342] border-[#CBD5E1] text-white hover:bg-[#112F55]"
+                  ? "bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed opacity-50"
+                  : "bg-cyan-700 border-cyan-600 text-white hover:bg-cyan-600"
               }`}
             >
-              <Printer className="h-3.5 w-3.5 text-[#D4AF37]" />
+              <Printer className="h-3.5 w-3.5 text-amber-400" />
               <span>PDF</span>
             </button>
           </div>
         </div>
 
         {/* Tab Controls mirroring TeamDashboard */}
-        <div className="flex border-b border-[#E2E8F0] gap-1 overflow-x-auto whitespace-nowrap scrollbar-none no-print" id="detailed-tabs">
+        <div className="flex border-b border-gray-800 gap-1 overflow-x-auto whitespace-nowrap scrollbar-none no-print" id="detailed-tabs">
           {[
             { id: "General", icon: Target, label: "General" },
             { id: "Tactical Stats", icon: RefreshCw, label: "Tactical Stats" },
@@ -600,11 +600,11 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
                 onClick={() => setActiveTab(tab.id as TabType)}
                 className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer shrink-0 ${
                   activeTab === tab.id
-                    ? "border-[#1D4ED8] text-[#1D4ED8] font-bold bg-[#1D4ED8]/5 rounded-t"
-                    : "border-transparent text-slate-500 hover:text-[#0A2342] hover:border-slate-300"
+                    ? "border-cyan-400 text-cyan-400 font-bold bg-cyan-950/40 rounded-t"
+                    : "border-transparent text-gray-400 hover:text-white hover:border-gray-600"
                 }`}
               >
-                <Icon className={`h-4 w-4 ${activeTab === tab.id ? "text-[#1D4ED8]" : "text-slate-400"}`} />
+                <Icon className={`h-4 w-4 ${activeTab === tab.id ? "text-cyan-400" : "text-gray-400"}`} />
                 <span>{tab.label}</span>
               </button>
             );
@@ -614,10 +614,10 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
         {/* Detailed Metrics Content identical to TeamDashboard */}
         <div className="space-y-6">
           {oppMatchesList.length === 0 && !isOurSelected && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex gap-3 text-xs leading-relaxed text-amber-800 shadow-xs animate-fadeIn no-print" id="empty-scouting-data-banner">
-              <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5 animate-pulse" />
+            <div className="rounded-xl border border-amber-900/60 bg-amber-950/30 p-4 flex gap-3 text-xs leading-relaxed text-amber-200 shadow-xs animate-fadeIn no-print" id="empty-scouting-data-banner">
+              <AlertCircle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5 animate-pulse" />
               <div className="font-sans">
-                <p className="font-bold uppercase tracking-wider text-amber-900 text-[10px]">No Match Data Uploaded</p>
+                <p className="font-bold uppercase tracking-wider text-amber-300 text-[10px]">No Match Data Uploaded</p>
                 <p className="mt-0.5">
                   We have not registered or uploaded any Match spreadsheets for games played against <strong>{selectedOpponentName}</strong> yet. Showing default baseline values (0.0). Log match data on the schedule page to update these metrics automatically.
                 </p>
@@ -631,16 +631,16 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
             {activeTab === "General" ? (
               <div className="space-y-6 w-full" id="general-grouped">
                 {/* Shots Card */}
-                <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-xs">
-                  <div className="border-b border-[#E2E8F0] pb-3 mb-4">
-                    <h3 className="font-display font-extrabold text-[#0A2342] text-xs sm:text-sm flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-[#1D4ED8]" />
+                <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 shadow-xl">
+                  <div className="border-b border-gray-800 pb-3 mb-4">
+                    <h3 className="font-display font-extrabold text-white text-xs sm:text-sm flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-cyan-400" />
                       Shots & Conversion Metrics
                     </h3>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <h4 className="text-[10px] font-bold text-[#1D4ED8] bg-blue-50 px-2 py-0.5 rounded-sm uppercase tracking-wider mb-2.5 inline-flex items-center gap-1">
+                      <h4 className="text-[10px] font-bold text-cyan-400 bg-cyan-950/60 border border-cyan-800 px-2 py-0.5 rounded-sm uppercase tracking-wider mb-2.5 inline-flex items-center gap-1">
                         KPI Ratings
                       </h4>
                       <div className="space-y-1.5 pl-1">
@@ -653,7 +653,7 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
                       </div>
                     </div>
                     <div>
-                      <h4 className="text-[10px] font-bold text-[#0A2342] bg-slate-100 px-2 py-0.5 rounded-sm uppercase tracking-wider mb-2.5 inline-flex items-center gap-1">
+                      <h4 className="text-[10px] font-bold text-gray-300 bg-gray-800 border border-gray-700 px-2 py-0.5 rounded-sm uppercase tracking-wider mb-2.5 inline-flex items-center gap-1">
                         Performance Indicators (PI)
                       </h4>
                       <div className="space-y-1.5 pl-1">
@@ -670,16 +670,16 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
                 </div>
 
                 {/* Passes Card */}
-                <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-xs">
-                  <div className="border-b border-[#E2E8F0] pb-3 mb-4">
-                    <h3 className="font-display font-extrabold text-[#0A2342] text-xs sm:text-sm flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-[#10B981]" />
+                <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 shadow-xl">
+                  <div className="border-b border-gray-800 pb-3 mb-4">
+                    <h3 className="font-display font-extrabold text-white text-xs sm:text-sm flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400" />
                       Pass Accuracy & Distribution
                     </h3>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <h4 className="text-[10px] font-bold text-[#1D4ED8] bg-blue-50 px-2 py-0.5 rounded-sm uppercase tracking-wider mb-2.5 inline-flex items-center gap-1">
+                      <h4 className="text-[10px] font-bold text-cyan-400 bg-cyan-950/60 border border-cyan-800 px-2 py-0.5 rounded-sm uppercase tracking-wider mb-2.5 inline-flex items-center gap-1">
                         KPI Ratings
                       </h4>
                       <div className="space-y-1.5 pl-1">
@@ -696,7 +696,7 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
                       </div>
                     </div>
                     <div>
-                      <h4 className="text-[10px] font-bold text-[#0A2342] bg-slate-100 px-2 py-0.5 rounded-sm uppercase tracking-wider mb-2.5 inline-flex items-center gap-1">
+                      <h4 className="text-[10px] font-bold text-gray-300 bg-gray-800 border border-gray-700 px-2 py-0.5 rounded-sm uppercase tracking-wider mb-2.5 inline-flex items-center gap-1">
                         Performance Indicators (PI)
                       </h4>
                       <div className="space-y-1.5 pl-1">
@@ -715,16 +715,16 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
                 </div>
 
                 {/* Distribution & Defending */}
-                <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-xs">
-                  <div className="border-b border-[#E2E8F0] pb-3 mb-4">
-                    <h3 className="font-display font-extrabold text-[#0A2342] text-xs sm:text-sm flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-[#EF4444]" />
+                <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 shadow-xl">
+                  <div className="border-b border-gray-800 pb-3 mb-4">
+                    <h3 className="font-display font-extrabold text-white text-xs sm:text-sm flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-rose-400" />
                       Distribution & Defending Block
                     </h3>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <h4 className="text-[10px] font-bold text-[#1D4ED8] bg-blue-50 px-2 py-0.5 rounded-sm uppercase tracking-wider mb-2.5 inline-flex items-center gap-1">
+                      <h4 className="text-[10px] font-bold text-cyan-400 bg-cyan-950/60 border border-cyan-800 px-2 py-0.5 rounded-sm uppercase tracking-wider mb-2.5 inline-flex items-center gap-1">
                         KPI Ratings
                       </h4>
                       <div className="space-y-1.5 pl-1">
@@ -739,7 +739,7 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
                       </div>
                     </div>
                     <div>
-                      <h4 className="text-[10px] font-bold text-[#0A2342] bg-slate-100 px-2 py-0.5 rounded-sm uppercase tracking-wider mb-2.5 inline-flex items-center gap-1">
+                      <h4 className="text-[10px] font-bold text-gray-300 bg-gray-800 border border-gray-700 px-2 py-0.5 rounded-sm uppercase tracking-wider mb-2.5 inline-flex items-center gap-1">
                         Performance Indicators (PI)
                       </h4>
                       <div className="space-y-1.5 pl-1">
@@ -760,14 +760,14 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
               </div>
             ) : activeTab === "Tactical Stats" ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-xs">
-                  <div className="border-b border-[#E2E8F0] pb-3 mb-4">
-                    <h3 className="font-display font-bold text-[#0A2342] flex items-center gap-2 text-xs sm:text-sm">
-                      <span className="flex h-4 w-4 items-center justify-center rounded bg-[#1D4ED8] text-[9px] font-bold text-white">KPI</span>
+                <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 shadow-xl">
+                  <div className="border-b border-gray-800 pb-3 mb-4">
+                    <h3 className="font-display font-bold text-white flex items-center gap-2 text-xs sm:text-sm">
+                      <span className="flex h-4 w-4 items-center justify-center rounded bg-cyan-600 text-[9px] font-bold text-white">KPI</span>
                       Tactical KPIs
                     </h3>
                   </div>
-                  <div className="space-y-1.5 Pl-1">
+                  <div className="space-y-1.5 pl-1">
                     <MetricRow label="Goal conversion" {...getKpiStats("goalConversion")} unit="%" />
                     <MetricRow label="Shot accuracy" {...getKpiStats("shotAccuracyTotal")} unit="%" />
                     <MetricRow label="Counter attack Shot proportion" {...getKpiStats("counterAttackShotProp")} unit="%" />
@@ -776,14 +776,14 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-xs">
-                  <div className="border-b border-[#E2E8F0] pb-3 mb-4">
-                    <h3 className="font-display font-bold text-[#0A2342] flex items-center gap-2 text-xs sm:text-sm">
-                      <span className="flex h-4 w-4 items-center justify-center rounded bg-slate-100 text-[9px] font-bold text-slate-700">PI</span>
+                <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 shadow-xl">
+                  <div className="border-b border-gray-800 pb-3 mb-4">
+                    <h3 className="font-display font-bold text-white flex items-center gap-2 text-xs sm:text-sm">
+                      <span className="flex h-4 w-4 items-center justify-center rounded bg-gray-800 text-[9px] font-bold text-gray-300 border border-gray-700">PI</span>
                       Tactical PIs (Transition & Control)
                     </h3>
                   </div>
-                  <div className="space-y-1.5 Pl-1">
+                  <div className="space-y-1.5 pl-1">
                     <MetricRow label="Counter attacks" {...getPiStats("counterAttacks")} />
                     <MetricRow label="Turnovers" {...getPiStats("turnovers")} />
                     <MetricRow label="Transition passes" {...getPiStats("transitionPasses")} />
@@ -796,14 +796,14 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-xs">
-                  <div className="border-b border-[#E2E8F0] pb-3 mb-4">
-                    <h3 className="font-display font-bold text-[#0A2342] flex items-center gap-2 text-xs sm:text-sm">
-                      <span className="flex h-4 w-4 items-center justify-center rounded bg-[#1D4ED8] text-[9px] font-bold text-white">KPI</span>
+                <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 shadow-xl">
+                  <div className="border-b border-gray-800 pb-3 mb-4">
+                    <h3 className="font-display font-bold text-white flex items-center gap-2 text-xs sm:text-sm">
+                      <span className="flex h-4 w-4 items-center justify-center rounded bg-cyan-600 text-[9px] font-bold text-white">KPI</span>
                       Set Piece KPIs
                     </h3>
                   </div>
-                  <div className="space-y-1.5 Pl-1">
+                  <div className="space-y-1.5 pl-1">
                     <MetricRow label="Set Piece xG" {...getKpiStats("setPieceXg")} />
                     <MetricRow label="Set Piece xG Allowed" {...getKpiStats("setPieceXgAllowed")} />
                     <MetricRow label="Free kick Goal conversion" {...getKpiStats("freeKickGoalConversion")} unit="%" />
@@ -816,14 +816,14 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-xs">
-                  <div className="border-b border-[#E2E8F0] pb-3 mb-4">
-                    <h3 className="font-display font-bold text-[#0A2342] flex items-center gap-2 text-xs sm:text-sm">
-                      <span className="flex h-4 w-4 items-center justify-center rounded bg-slate-100 text-[9px] font-bold text-slate-700">PI</span>
+                <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 shadow-xl">
+                  <div className="border-b border-gray-800 pb-3 mb-4">
+                    <h3 className="font-display font-bold text-white flex items-center gap-2 text-xs sm:text-sm">
+                      <span className="flex h-4 w-4 items-center justify-center rounded bg-gray-800 text-[9px] font-bold text-gray-300 border border-gray-700">PI</span>
                       Set Piece PIs
                     </h3>
                   </div>
-                  <div className="space-y-1.5 Pl-1">
+                  <div className="space-y-1.5 pl-1">
                     <MetricRow label="Corners" {...getPiStats("corners")} />
                     <MetricRow label="Free kicks" {...getPiStats("freeKicks")} />
                     <MetricRow label="Long Throws" {...getPiStats("longThrows")} />
@@ -839,10 +839,10 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
 
             {/* Performance Trend Graph identical to TeamDashboard */}
             {chronologicalMetrics.length > 0 && (
-              <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-xs no-print">
-                <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3 mb-4">
-                  <h3 className="font-display font-bold text-[#0A2342] text-xs sm:text-sm flex items-center gap-2">
-                    <Layers className="h-4 w-4 text-[#1D4ED8]" />
+              <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 shadow-xl no-print">
+                <div className="flex items-center justify-between border-b border-gray-800 pb-3 mb-4">
+                  <h3 className="font-display font-bold text-white text-xs sm:text-sm flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-cyan-400" />
                     Performance Chronological Trend ({selectedOpponentName})
                   </h3>
                 </div>
@@ -850,14 +850,14 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
                 <div className="h-64 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chronologicalMetrics}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-                      <XAxis dataKey="name" tick={{ fontSize: 9, fill: "#64748B" }} stroke="#CBD5E1" />
-                      <YAxis yAxisId="left" tick={{ fontSize: 9, fill: "#64748B" }} stroke="#1D4ED8" />
-                      <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 9, fill: "#64748B" }} stroke="#10B981" />
-                      <Tooltip contentStyle={{ backgroundColor: "#ffffff", borderColor: "#E2E8F0", fontSize: 11 }} />
-                      <Legend wrapperStyle={{ fontSize: 10 }} />
-                      <Line yAxisId="left" type="monotone" dataKey="Shots" stroke="#1D4ED8" strokeWidth={2} name="Shots Attempted" activeDot={{ r: 5 }} />
-                      <Line yAxisId="right" type="monotone" dataKey="Attack xG" stroke="#10B981" strokeWidth={2} name="Goals Scored" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis dataKey="name" tick={{ fontSize: 9, fill: "#9CA3AF" }} stroke="#4B5563" />
+                      <YAxis yAxisId="left" tick={{ fontSize: 9, fill: "#9CA3AF" }} stroke="#38BDF8" />
+                      <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 9, fill: "#9CA3AF" }} stroke="#34D399" />
+                      <Tooltip contentStyle={{ backgroundColor: "#111827", borderColor: "#374151", color: "#F3F4F6", fontSize: 11 }} />
+                      <Legend wrapperStyle={{ fontSize: 10, color: "#9CA3AF" }} />
+                      <Line yAxisId="left" type="monotone" dataKey="Shots" stroke="#38BDF8" strokeWidth={2} name="Shots Attempted" activeDot={{ r: 5 }} />
+                      <Line yAxisId="right" type="monotone" dataKey="Attack xG" stroke="#34D399" strokeWidth={2} name="Goals Scored" />
                       <Line yAxisId="left" type="monotone" dataKey="Recoveries" stroke="#EF4444" strokeWidth={1.5} name="Ball Recoveries" />
                       <Line yAxisId="right" type="monotone" dataKey="Corners" stroke="#F59E0B" strokeWidth={1.5} name="Corners Won" />
                     </LineChart>
@@ -874,66 +874,96 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
 
   // Render 3: Advanced comparison mode between 2 teams
   if (activeSubView === "comparison") {
-    // Determine category specific radar and side-by-side data lists
-    const isCategoryAtt = radarCategory === "General";
-    const isCategoryTac = radarCategory === "Tactical Stats";
-    const isCategorySet = radarCategory === "Set Pieces";
-
-    const getCompKpiStats = (key: string) => {
-      const valA = getKpiVal(statsA, key);
-      const valB = getKpiVal(statsB, key);
-      return { A: valA, B: valB };
+    const getTeamTotals = (teamMatches: MatchData[]) => {
+      return teamMatches.reduce((acc, m: any) => {
+        acc.goals += Number(m.goals ?? m.our_score ?? m.ourScore ?? 0);
+        acc.shots += Number(m.shots || 0);
+        acc.shots_on_target += Number(m.shots_on_target || m.shotsOnTarget || 0);
+        acc.passes += Number(m.passes || m.total_passes || m.totalPasses || 0);
+        acc.successful_passes += Number(m.successful_passes || m.completed_passes || m.successfulPasses || 0);
+        acc.backwards_passes += Number(m.backwards_passes || m.backwardsPasses || 0);
+        acc.forwards_passes += Number(m.forwards_passes || m.forwardsPasses || 0);
+        acc.long_passes += Number(m.long_passes || m.longPasses || 0);
+        acc.key_passes += Number(m.key_passes || m.keyPasses || 0);
+        acc.through_balls += Number(m.through_balls || m.throughBalls || 0);
+        acc.crosses += Number(m.crosses || 0);
+        acc.successful_crosses += Number(m.successful_crosses || m.successfulCrosses || 0);
+        acc.dribbles += Number(m.dribbles || 0);
+        acc.successful_dribbles += Number(m.successful_dribbles || m.successfulDribbles || 0);
+        acc.duels += Number(m.duels || 0);
+        acc.duels_won += Number(m.duels_won || m.duelsWon || 0);
+        acc.aerial_duels += Number(m.aerial_duels || m.aerialDuels || 0);
+        acc.aerial_duels_won += Number(m.aerial_duels_won || m.aerialDuelsWon || 0);
+        acc.ground_duels += Number(m.ground_duels || m.groundDuels || 0);
+        acc.ground_duels_won += Number(m.ground_duels_won || m.groundDuelsWon || 0);
+        acc.ball_recoveries += Number(m.ball_recoveries || m.ballRecoveries || 0);
+        acc.tackles += Number(m.tackles || 0);
+        acc.tackles_won += Number(m.tackles_won || m.tacklesWon || 0);
+        acc.interceptions += Number(m.interceptions || 0);
+        acc.clearances += Number(m.clearances || 0);
+        acc.blocks += Number(m.blocks || 0);
+        acc.own_goals += Number(m.own_goals || m.ownGoals || 0);
+        acc.turnovers += Number(m.turnovers || 0);
+        acc.miscontrols += Number(m.miscontrols || m.miscontrol || 0);
+        acc.unsuccessful_dribbles += Number(m.unsuccessful_dribbles || m.unsuccessfulDribbles || 0);
+        acc.possession_lost += Number(m.possession_lost || m.possessionLost || 0);
+        acc.offsides += Number(m.offsides || m.offside || 0);
+        acc.fouls += Number(m.fouls || 0);
+        acc.yellow_cards += Number(m.yellow_cards || m.yellowCards || 0);
+        acc.red_cards += Number(m.red_cards || m.redCards || 0);
+        return acc;
+      }, {
+        goals: 0, shots: 0, shots_on_target: 0, passes: 0, successful_passes: 0,
+        backwards_passes: 0, forwards_passes: 0, long_passes: 0, key_passes: 0,
+        through_balls: 0, crosses: 0, successful_crosses: 0, dribbles: 0,
+        successful_dribbles: 0, duels: 0, duels_won: 0, aerial_duels: 0,
+        aerial_duels_won: 0, ground_duels: 0, ground_duels_won: 0, ball_recoveries: 0,
+        tackles: 0, tackles_won: 0, interceptions: 0, clearances: 0, blocks: 0,
+        own_goals: 0, turnovers: 0, miscontrols: 0, unsuccessful_dribbles: 0,
+        possession_lost: 0, offsides: 0, fouls: 0, yellow_cards: 0, red_cards: 0
+      });
     };
 
-    const getCompPiStats = (key: string) => {
-      const valA = getPiVal(statsA, key);
-      const valB = getPiVal(statsB, key);
-      return { A: valA, B: valB };
-    };
+    const totalsA = getTeamTotals(statsA.matches);
+    const totalsB = getTeamTotals(statsB.matches);
+    const countA = statsA.matches.length || 1;
+    const countB = statsB.matches.length || 1;
+
+    const safePct = (num: number, den: number) => den > 0 ? Number(((num / den) * 100).toFixed(1)) : 0;
+    const safeAvg = (sum: number, count: number) => (count > 0 ? sum / count : 0).toFixed(1);
+
+    const dynamicRadarData = [
+      { subject: "Shot Accuracy", A: safePct(totalsA.shots_on_target, totalsA.shots), B: safePct(totalsB.shots_on_target, totalsB.shots), fullMark: 100 },
+      { subject: "Goal Conversion", A: safePct(totalsA.goals, totalsA.shots), B: safePct(totalsB.goals, totalsB.shots), fullMark: 100 },
+      { subject: "Pass Accuracy", A: safePct(totalsA.successful_passes, totalsA.passes), B: safePct(totalsB.successful_passes, totalsB.passes), fullMark: 100 },
+      { subject: "Duel Won %", A: safePct(totalsA.duels_won, totalsA.duels), B: safePct(totalsB.duels_won, totalsB.duels), fullMark: 100 },
+      { subject: "Tackle Won %", A: safePct(totalsA.tackles_won, totalsA.tackles), B: safePct(totalsB.tackles_won, totalsB.tackles), fullMark: 100 },
+      { subject: "Cross Suc %", A: safePct(totalsA.successful_crosses, totalsA.crosses), B: safePct(totalsB.successful_crosses, totalsB.crosses), fullMark: 100 },
+    ];
 
     return (
-      <div className="space-y-6 animate-fadeIn" id="opponent-comparison-view">
+      <div className="space-y-6 animate-fadeIn text-gray-200" id="opponent-comparison-view">
         {/* Navigation Breadcrumb */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-[#E2E8F0] pb-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-800 pb-4">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setActiveSubView("standings")}
-              className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              className="p-1.5 hover:bg-gray-800 rounded-lg transition-colors cursor-pointer text-cyan-400 hover:text-white"
               title="Return to standings"
             >
-              <ArrowLeft className="h-5 w-5 text-[#0A2342]" />
+              <ArrowLeft className="h-5 w-5" />
             </button>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] bg-[#0A2342] text-white px-2 py-0.5 rounded font-mono font-bold tracking-wider uppercase">
-                  ⚔️ Matchup comparison
+                <span className="text-[10px] bg-cyan-950/80 border border-cyan-500/40 text-cyan-400 px-2 py-0.5 rounded font-mono font-bold tracking-wider uppercase">
+                  ⚔️ Matchup Comparison
                 </span>
-                <span className="text-xs text-slate-400 font-bold">CCFL Division Scouting</span>
+                <span className="text-xs text-gray-400 font-bold">CCFL Division Scouting</span>
               </div>
-              <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-[#0A2342] mt-0.5">
-                {compareTeamA} <span className="text-slate-400 font-normal">vs</span> {compareTeamB}
+              <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-white mt-0.5">
+                {compareTeamA} <span className="text-gray-400 font-normal">vs</span> {compareTeamB}
               </h2>
             </div>
-          </div>
-
-          <div className="flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-lg p-1 shadow-2xs no-print">
-            {[
-              { id: "General", label: "General" },
-              { id: "Tactical Stats", label: "Tactical" },
-              { id: "Set Pieces", label: "Set Piece" }
-            ].map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => setRadarCategory(cat.id as TabType)}
-                className={`px-3 py-1 text-xs font-bold rounded transition-all cursor-pointer ${
-                  radarCategory === cat.id
-                    ? "bg-[#0A2342] text-white shadow-xs"
-                    : "text-slate-600 hover:text-[#0A2342] hover:bg-slate-200/50"
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
           </div>
         </div>
 
@@ -941,174 +971,150 @@ export default function OpponentAnalysis({ matches, defaultOpponent, customTeams
         <div className="grid gap-6 lg:grid-cols-3">
           
           {/* Radar Chart Card */}
-          <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-xs lg:col-span-2 flex flex-col justify-between">
+          <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 shadow-xl lg:col-span-2 flex flex-col justify-between">
             <div>
-              <h3 className="font-display font-extrabold text-[#0A2342] text-xs sm:text-sm flex items-center justify-between border-b border-[#E2E8F0] pb-3 mb-4">
+              <h3 className="font-display font-extrabold text-white text-xs sm:text-sm flex items-center justify-between border-b border-gray-800 pb-3 mb-4">
                 <span className="flex items-center gap-2">
-                  <ArrowRightLeft className="h-4 w-4 text-[#1D4ED8]" />
+                  <ArrowRightLeft className="h-4 w-4 text-cyan-400" />
                   KPI Comparative Spider Radar
                 </span>
-                <span className="text-[10.5px] font-mono text-[#1D4ED8] uppercase tracking-wider font-bold">
-                  {radarCategory} Category
+                <span className="text-[10.5px] font-mono text-cyan-400 uppercase tracking-wider font-bold">
+                  6 Core Metrics %
                 </span>
               </h3>
             </div>
 
             <div className="h-72 w-full flex items-center justify-center">
               <ResponsiveContainer width="100%" height="100%">
-                <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
-                  <PolarGrid stroke="#E2E8F0" />
-                  <PolarAngleAxis dataKey="subject" tick={{ fill: "#64748B", fontSize: 10, fontWeight: 600 }} />
-                  <PolarRadiusAxis stroke="#CBD5E1" angle={30} domain={[0, 100]} tick={{ fill: "#64748B", fontSize: 8 }} />
-                  <Radar name={compareTeamA} dataKey="A" stroke="#1D4ED8" fill="#1D4ED8" fillOpacity={0.35} strokeWidth={2} />
-                  <Radar name={compareTeamB} dataKey="B" stroke="#EF4444" fill="#EF4444" fillOpacity={0.35} strokeWidth={2} />
-                  <Tooltip contentStyle={{ backgroundColor: "#ffffff", borderColor: "#E2E8F0", fontSize: 11 }} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                <RadarChart cx="50%" cy="50%" outerRadius="75%" data={dynamicRadarData}>
+                  <PolarGrid stroke="#4B5563" />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: "#9CA3AF", fontSize: 10, fontWeight: 600 }} />
+                  <PolarRadiusAxis stroke="#4B5563" angle={30} domain={[0, 100]} tick={{ fill: "#9CA3AF", fontSize: 8 }} />
+                  <Radar name={compareTeamA} dataKey="A" stroke="#38bdf8" fill="#38bdf8" fillOpacity={0.35} strokeWidth={2} />
+                  <Radar name={compareTeamB} dataKey="B" stroke="#f43f5e" fill="#f43f5e" fillOpacity={0.35} strokeWidth={2} />
+                  <Tooltip contentStyle={{ backgroundColor: "#111827", borderColor: "#374151", color: "#f3f4f6", fontSize: 11 }} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: "#9ca3af" }} />
                 </RadarChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           {/* Key Differences Briefing Card */}
-          <div className="rounded-xl border border-[#E2E8F0] bg-[#0A2342] p-5 shadow-xs text-white flex flex-col justify-between">
+          <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 shadow-xl text-white flex flex-col justify-between">
             <div className="space-y-4">
-              <div className="flex items-center gap-1.5 border-b border-white/10 pb-2">
+              <div className="flex items-center gap-1.5 border-b border-gray-800 pb-2">
                 <Sparkles className="h-4.5 w-4.5 text-emerald-400" />
                 <h3 className="text-xs font-mono font-bold tracking-wider uppercase text-emerald-400">Head-to-Head Briefing</h3>
               </div>
 
-              <div className="space-y-3.5 text-xs text-[#E2E8F0]">
+              <div className="space-y-3.5 text-xs text-gray-300">
                 <div>
                   <p className="font-bold text-white text-[11px] uppercase tracking-wider mb-1 font-sans">{compareTeamA} Playstyle</p>
-                  <p className="leading-relaxed text-[10.5px] text-slate-300">
-                    Averages <strong className="text-white">{statsA.avg.goals?.toFixed(1) || "0.0"} goals</strong> and <strong className="text-white">{statsA.avg.shots?.toFixed(1) || "0.0"} shots</strong> per match. Possession rate is <strong className="text-white">{statsA.avg.possessionRate?.toFixed(1) || "50"}%</strong> with a defensive duel win rate of <strong className="text-white">{statsA.def.defensiveDuelWinRate?.toFixed(1) || "50"}%</strong>.
+                  <p className="leading-relaxed text-[10.5px] text-gray-400">
+                    Averages <strong className="text-white">{safeAvg(totalsA.goals, countA)} goals</strong> and <strong className="text-white">{safeAvg(totalsA.shots, countA)} shots</strong> per match. Shot accuracy is <strong className="text-cyan-400">{safePct(totalsA.shots_on_target, totalsA.shots)}%</strong> with pass accuracy of <strong className="text-cyan-400">{safePct(totalsA.successful_passes, totalsA.passes)}%</strong>.
                   </p>
                 </div>
 
-                <div className="border-t border-white/10 pt-3">
+                <div className="border-t border-gray-800 pt-3">
                   <p className="font-bold text-white text-[11px] uppercase tracking-wider mb-1 font-sans">{compareTeamB} Playstyle</p>
-                  <p className="leading-relaxed text-[10.5px] text-slate-300">
-                    Averages <strong className="text-white">{statsB.avg.goals?.toFixed(1) || "0.0"} goals</strong> and <strong className="text-white">{statsB.avg.shots?.toFixed(1) || "0.0"} shots</strong> per match. Possession rate is <strong className="text-white">{statsB.avg.possessionRate?.toFixed(1) || "50"}%</strong> with a defensive duel win rate of <strong className="text-white">{statsB.def.defensiveDuelWinRate?.toFixed(1) || "50"}%</strong>.
+                  <p className="leading-relaxed text-[10.5px] text-gray-400">
+                    Averages <strong className="text-white">{safeAvg(totalsB.goals, countB)} goals</strong> and <strong className="text-white">{safeAvg(totalsB.shots, countB)} shots</strong> per match. Shot accuracy is <strong className="text-rose-400">{safePct(totalsB.shots_on_target, totalsB.shots)}%</strong> with pass accuracy of <strong className="text-rose-400">{safePct(totalsB.successful_passes, totalsB.passes)}%</strong>.
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="border-t border-white/10 pt-3 text-[10px] text-slate-400 flex items-start gap-1.5 mt-4">
-              <AlertCircle className="h-4 w-4 text-slate-400 shrink-0" />
-              <span>Use these spider overlays to adjust passing patterns, high press triggers, or corner positioning.</span>
+            <div className="border-t border-gray-800 pt-3 text-[10px] text-gray-400 flex items-start gap-1.5 mt-4">
+              <AlertCircle className="h-4 w-4 text-gray-400 shrink-0" />
+              <span>Use these spider overlays and match averages to adjust passing patterns, high press triggers, or defensive structure.</span>
             </div>
           </div>
         </div>
 
         {/* Side-by-Side Detailed Comparison Grid matching full metric view */}
-        <div className="rounded-xl border border-[#E2E8F0] bg-white overflow-hidden shadow-xs">
-          <div className="bg-[#F8FAFC] border-b border-[#E2E8F0] px-4 py-3 flex items-center justify-between">
-            <h3 className="font-display font-extrabold text-[#0A2342] text-xs sm:text-sm flex items-center gap-1.5">
-              <Shield className="h-4.5 w-4.5 text-[#1D4ED8]" />
-              Detailed Side-by-Side Analysis Grid
+        <div className="rounded-xl border border-gray-800 bg-gray-900 overflow-hidden shadow-xl">
+          <div className="bg-gray-800/90 border-b border-gray-700 px-4 py-3 flex items-center justify-between">
+            <h3 className="font-display font-extrabold text-white text-xs sm:text-sm flex items-center gap-1.5 uppercase tracking-wider">
+              <Shield className="h-4.5 w-4.5 text-cyan-400" />
+              Detailed Side-by-Side Analysis Grid (Match Averages)
             </h3>
           </div>
 
-          <div className="divide-y divide-slate-150">
+          <div className="divide-y divide-gray-800 text-xs font-sans">
             {/* Header row */}
-            <div className="grid grid-cols-4 bg-slate-50 text-[10px] uppercase font-extrabold text-slate-500 py-2.5 px-4 font-sans tracking-wider border-b border-slate-200">
-              <div className="col-span-2">Performance Variable / Metric</div>
-              <div className="text-center text-[#1D4ED8]">{compareTeamA} (A)</div>
-              <div className="text-center text-red-600">{compareTeamB} (B)</div>
+            <div className="grid grid-cols-3 bg-gray-800/60 text-[11px] uppercase font-mono font-bold text-gray-400 py-3 px-4 tracking-wider border-b border-gray-700 text-center">
+              <div className="text-cyan-400 font-extrabold">{compareTeamA} (A)</div>
+              <div className="text-white">Metric Name</div>
+              <div className="text-rose-400 font-extrabold">{compareTeamB} (B)</div>
             </div>
 
-            {/* General (Attack & Defense) Grid */}
-            {isCategoryAtt && (
-              <>
-                <div className="bg-blue-50/25 px-4 py-1.5 text-[10px] font-extrabold text-[#1D4ED8] uppercase tracking-widest font-mono">KPI Measures</div>
-                <CompMetricRow label="Expected Goals (xG)" {...getCompKpiStats("xG")} />
-                <CompMetricRow label="Shot accuracy Total (Inside/outside the box)" {...getCompKpiStats("shotAccuracyTotal")} unit="%" />
-                <CompMetricRow label="Shot accuracy excluding blocked shots" {...getCompKpiStats("shotAccuracyExclBlocked")} unit="%" />
-                <CompMetricRow label="Goal conversion rate" {...getCompKpiStats("goalConversion")} unit="%" />
-                <CompMetricRow label="Shots outside the box proportion" {...getCompKpiStats("shotsOutsideBoxProp")} unit="%" />
-                <CompMetricRow label="Shots inside the box proportion" {...getCompKpiStats("shotsInsideBoxProp")} unit="%" />
-                <CompMetricRow label="Tackle success rate" {...getCompKpiStats("tackleSuccessRate")} unit="%" />
-                <CompMetricRow label="Defensive Duel Win rate" {...getCompKpiStats("defensiveDuelWinRate")} unit="%" />
-                
-                <div className="bg-slate-50 px-4 py-1.5 text-[10px] font-extrabold text-[#0A2342] uppercase tracking-widest font-mono">Performance Indicators (PI)</div>
-                <CompMetricRow label="Goals Scored" {...getCompPiStats("goals")} />
-                <CompMetricRow label="Shots Attempted" {...getCompPiStats("shots")} />
-                <CompMetricRow label="Shots On Target" {...getCompPiStats("shotsOnTarget")} />
-                <CompMetricRow label="Blocked Shots" {...getCompPiStats("blockedShots")} />
-                <CompMetricRow label="Headed Shots" {...getCompPiStats("headedShots")} />
-                <CompMetricRow label="Shots Inside the Box" {...getCompPiStats("insideBoxShots")} />
-                <CompMetricRow label="Shots Outside the Box" {...getCompPiStats("shotsOutsideBox")} />
-                <CompMetricRow label="Tackles Attempted" {...getCompPiStats("tackles")} />
-                <CompMetricRow label="Clearances" {...getCompPiStats("clearances")} />
-                <CompMetricRow label="Interceptions" {...getCompPiStats("interceptions")} />
-                <CompMetricRow label="Blocked Opponent Shots" {...getCompPiStats("blocks")} />
-                <CompMetricRow label="Ball Recoveries" {...getCompPiStats("ballRecoveries")} />
-                <CompMetricRow label="Yellow Cards" {...getCompPiStats("yellowCards")} />
-                <CompMetricRow label="Red Cards" {...getCompPiStats("redCard")} />
-              </>
-            )}
+            {/* ATTACK */}
+            <div className="bg-slate-950/80 px-4 py-2 text-[11px] font-mono font-black text-amber-400 uppercase tracking-widest border-b border-gray-800">
+              ATTACK
+            </div>
+            <MetricCompRow label="Goals" valA={safeAvg(totalsA.goals, countA)} valB={safeAvg(totalsB.goals, countB)} />
+            <MetricCompRow label="Shot" valA={safeAvg(totalsA.shots, countA)} valB={safeAvg(totalsB.shots, countB)} />
+            <MetricCompRow label="SOT" valA={safeAvg(totalsA.shots_on_target, countA)} valB={safeAvg(totalsB.shots_on_target, countB)} />
 
-            {/* Tactical Stats Grid */}
-            {isCategoryTac && (
-              <>
-                <div className="bg-blue-50/25 px-4 py-1.5 text-[10px] font-extrabold text-[#1D4ED8] uppercase tracking-widest font-mono">KPI Measures</div>
-                <CompMetricRow label="Pass accuracy" {...getCompKpiStats("passAccuracy")} unit="%" />
-                <CompMetricRow label="Long passes accuracy" {...getCompKpiStats("longPassesAccuracy")} unit="%" />
-                <CompMetricRow label="Passing accuracy in opponents half" {...getCompKpiStats("passesInOpponentHalfAccuracy")} unit="%" />
-                <CompMetricRow label="Passing accuracy in final third" {...getCompKpiStats("passesInFinalThirdAccuracy")} unit="%" />
-                <CompMetricRow label="Crossing accuracy" {...getCompKpiStats("crossingAccuracy")} unit="%" />
-                <CompMetricRow label="Open play crossing accuracy" {...getCompKpiStats("openPlayCrossingAccuracy")} unit="%" />
-                <CompMetricRow label="Long passes Proportion" {...getCompKpiStats("longPassesProp")} unit="%" />
-                <CompMetricRow label="Forward passes proportion" {...getCompKpiStats("forwardPassesProp")} unit="%" />
-                <CompMetricRow label="Key Passes proportion" {...getCompKpiStats("keyPassesProp")} unit="%" />
-                <CompMetricRow label="Counter attack Shot proportion" {...getCompKpiStats("counterAttackShotProp")} unit="%" />
-                <CompMetricRow label="Counter attack shot accuracy" {...getCompKpiStats("counterAttackShotAccuracy")} unit="%" />
-                <CompMetricRow label="Possession Value (PV)" {...getCompKpiStats("possessionValue")} />
+            {/* PASS */}
+            <div className="bg-slate-950/80 px-4 py-2 text-[11px] font-mono font-black text-cyan-400 uppercase tracking-widest border-b border-gray-800">
+              PASS
+            </div>
+            <MetricCompRow label="Passes" valA={safeAvg(totalsA.passes, countA)} valB={safeAvg(totalsB.passes, countB)} />
+            <MetricCompRow label="Backwards" valA={safeAvg(totalsA.backwards_passes, countA)} valB={safeAvg(totalsB.backwards_passes, countB)} />
+            <MetricCompRow label="Forwards" valA={safeAvg(totalsA.forwards_passes, countA)} valB={safeAvg(totalsB.forwards_passes, countB)} />
+            <MetricCompRow label="Long Passes" valA={safeAvg(totalsA.long_passes, countA)} valB={safeAvg(totalsB.long_passes, countB)} />
+            <MetricCompRow label="Key Passes" valA={safeAvg(totalsA.key_passes, countA)} valB={safeAvg(totalsB.key_passes, countB)} />
+            <MetricCompRow label="Through Balls" valA={safeAvg(totalsA.through_balls, countA)} valB={safeAvg(totalsB.through_balls, countB)} />
+            <MetricCompRow label="Crosses" valA={safeAvg(totalsA.crosses, countA)} valB={safeAvg(totalsB.crosses, countB)} />
 
-                <div className="bg-slate-50 px-4 py-1.5 text-[10px] font-extrabold text-[#0A2342] uppercase tracking-widest font-mono">Performance Indicators (PI)</div>
-                <CompMetricRow label="Team Possession Rate" {...getCompPiStats("possessionRate")} unit="%" />
-                <CompMetricRow label="Total Completed Passes" {...getCompPiStats("passes")} />
-                <CompMetricRow label="Key Passes Completed" {...getCompPiStats("keyPasses")} />
-                <CompMetricRow label="Long Passes Completed" {...getCompPiStats("longPasses")} />
-                <CompMetricRow label="Passes in Opponents Half" {...getCompPiStats("passesInOpponentHalf")} />
-                <CompMetricRow label="Passes in Final Third" {...getCompPiStats("finalThirdPasses")} />
-                <CompMetricRow label="Forward Oriented Passes" {...getCompPiStats("forwardPasses")} />
-                <CompMetricRow label="Through Balls" {...getCompPiStats("throughBalls")} />
-                <CompMetricRow label="Crosses Completed" {...getCompPiStats("crosses")} />
-                <CompMetricRow label="Open Play Crosses" {...getCompPiStats("openPlayCrosses")} />
-                <CompMetricRow label="Ball Recoveries" {...getCompPiStats("ballRecoveries")} />
-                <CompMetricRow label="Counter Attacks Triggered" {...getCompPiStats("counterAttacks")} />
-                <CompMetricRow label="Turnovers" {...getCompPiStats("turnovers")} />
-                <CompMetricRow label="Transition Passes Completed" {...getCompPiStats("transitionPasses")} />
-              </>
-            )}
+            {/* DRIBBLE */}
+            <div className="bg-slate-950/80 px-4 py-2 text-[11px] font-mono font-black text-emerald-400 uppercase tracking-widest border-b border-gray-800">
+              DRIBBLE
+            </div>
+            <MetricCompRow label="Dribbles" valA={safeAvg(totalsA.dribbles, countA)} valB={safeAvg(totalsB.dribbles, countB)} />
+            <MetricCompRow label="Dribble Suc" valA={safeAvg(totalsA.successful_dribbles, countA)} valB={safeAvg(totalsB.successful_dribbles, countB)} />
 
-            {/* Set Pieces Grid */}
-            {isCategorySet && (
-              <>
-                <div className="bg-blue-50/25 px-4 py-1.5 text-[10px] font-extrabold text-[#1D4ED8] uppercase tracking-widest font-mono">KPI Measures</div>
-                <CompMetricRow label="Set Piece Expected Goals (xG)" {...getCompKpiStats("setPieceXg")} />
-                <CompMetricRow label="Set Piece xG Allowed" {...getCompKpiStats("setPieceXgAllowed")} />
-                <CompMetricRow label="Free kick Goal conversion" {...getCompKpiStats("freeKickGoalConversion")} unit="%" />
-                <CompMetricRow label="Fouls committed average" {...getCompKpiStats("foulCommittedAvg")} />
-                <CompMetricRow label="Direct Free Kick Success rate" {...getCompKpiStats("directFreeKickSuccess")} unit="%" />
-                <CompMetricRow label="Free kick Crossing accuracy" {...getCompKpiStats("freeKickCrossingAccuracy")} unit="%" />
-                <CompMetricRow label="Corner to Shot rate" {...getCompKpiStats("cornerToShotRate")} unit="%" />
-                <CompMetricRow label="Corner to Shot Allowed rate" {...getCompKpiStats("cornerToShotAllowedRate")} unit="%" />
-                <CompMetricRow label="Corner to clearance rate" {...getCompKpiStats("cornerToClearanceRate")} unit="%" />
+            {/* DUEL */}
+            <div className="bg-slate-950/80 px-4 py-2 text-[11px] font-mono font-black text-indigo-400 uppercase tracking-widest border-b border-gray-800">
+              DUEL
+            </div>
+            <MetricCompRow label="Duels" valA={safeAvg(totalsA.duels, countA)} valB={safeAvg(totalsB.duels, countB)} />
+            <MetricCompRow label="Duels Won" valA={safeAvg(totalsA.duels_won, countA)} valB={safeAvg(totalsB.duels_won, countB)} />
+            <MetricCompRow label="Aerial Duels" valA={safeAvg(totalsA.aerial_duels, countA)} valB={safeAvg(totalsB.aerial_duels, countB)} />
+            <MetricCompRow label="Aerial Duels Won" valA={safeAvg(totalsA.aerial_duels_won, countA)} valB={safeAvg(totalsB.aerial_duels_won, countB)} />
+            <MetricCompRow label="Ground Duels" valA={safeAvg(totalsA.ground_duels, countA)} valB={safeAvg(totalsB.ground_duels, countB)} />
+            <MetricCompRow label="Ground Duel Won" valA={safeAvg(totalsA.ground_duels_won, countA)} valB={safeAvg(totalsB.ground_duels_won, countB)} />
 
-                <div className="bg-slate-50 px-4 py-1.5 text-[10px] font-extrabold text-[#0A2342] uppercase tracking-widest font-mono">Performance Indicators (PI)</div>
-                <CompMetricRow label="Corners Awarded" {...getCompPiStats("corners")} />
-                <CompMetricRow label="Free kicks Awarded" {...getCompPiStats("freeKicks")} />
-                <CompMetricRow label="Long Throws Made" {...getCompPiStats("longThrows")} />
-                <CompMetricRow label="Direct Free Kicks Attempted" {...getCompPiStats("directFreeKick")} />
-                <CompMetricRow label="Free Kick Crosses Attempted" {...getCompPiStats("freeKickCrosses")} />
-                <CompMetricRow label="Corners resulting in Shot" {...getCompPiStats("cornerToShot")} />
-                <CompMetricRow label="Opponent Corners resulting in Shot" {...getCompPiStats("cornerToShotAllowed")} />
-                <CompMetricRow label="Corners cleared" {...getCompPiStats("cornerToClearance")} />
-              </>
-            )}
+            {/* DEFENSIVE */}
+            <div className="bg-slate-950/80 px-4 py-2 text-[11px] font-mono font-black text-blue-400 uppercase tracking-widest border-b border-gray-800">
+              DEFENSIVE
+            </div>
+            <MetricCompRow label="Ball Recovery" valA={safeAvg(totalsA.ball_recoveries, countA)} valB={safeAvg(totalsB.ball_recoveries, countB)} />
+            <MetricCompRow label="Tackles" valA={safeAvg(totalsA.tackles, countA)} valB={safeAvg(totalsB.tackles, countB)} />
+            <MetricCompRow label="Tackle Won" valA={safeAvg(totalsA.tackles_won, countA)} valB={safeAvg(totalsB.tackles_won, countB)} />
+            <MetricCompRow label="Interceptions" valA={safeAvg(totalsA.interceptions, countA)} valB={safeAvg(totalsB.interceptions, countB)} />
+            <MetricCompRow label="Clearance" valA={safeAvg(totalsA.clearances, countA)} valB={safeAvg(totalsB.clearances, countB)} />
+            <MetricCompRow label="Blocks" valA={safeAvg(totalsA.blocks, countA)} valB={safeAvg(totalsB.blocks, countB)} />
+
+            {/* TURNOVER */}
+            <div className="bg-slate-950/80 px-4 py-2 text-[11px] font-mono font-black text-orange-400 uppercase tracking-widest border-b border-gray-800">
+              TURNOVER
+            </div>
+            <MetricCompRow label="Own Goals" valA={safeAvg(totalsA.own_goals, countA)} valB={safeAvg(totalsB.own_goals, countB)} />
+            <MetricCompRow label="Turnovers" valA={safeAvg(totalsA.turnovers, countA)} valB={safeAvg(totalsB.turnovers, countB)} />
+            <MetricCompRow label="Miscontrol" valA={safeAvg(totalsA.miscontrols, countA)} valB={safeAvg(totalsB.miscontrols, countB)} />
+            <MetricCompRow label="Uns Dribble" valA={safeAvg(totalsA.unsuccessful_dribbles, countA)} valB={safeAvg(totalsB.unsuccessful_dribbles, countB)} />
+            <MetricCompRow label="Possession Lost" valA={safeAvg(totalsA.possession_lost, countA)} valB={safeAvg(totalsB.possession_lost, countB)} />
+            <MetricCompRow label="Offside" valA={safeAvg(totalsA.offsides, countA)} valB={safeAvg(totalsB.offsides, countB)} />
+
+            {/* FOUL */}
+            <div className="bg-slate-950/80 px-4 py-2 text-[11px] font-mono font-black text-rose-400 uppercase tracking-widest border-b border-gray-800">
+              FOUL
+            </div>
+            <MetricCompRow label="Fouls" valA={safeAvg(totalsA.fouls, countA)} valB={safeAvg(totalsB.fouls, countB)} />
+            <MetricCompRow label="Yellow Card" valA={safeAvg(totalsA.yellow_cards, countA)} valB={safeAvg(totalsB.yellow_cards, countB)} />
+            <MetricCompRow label="Red Card" valA={safeAvg(totalsA.red_cards, countA)} valB={safeAvg(totalsB.red_cards, countB)} />
           </div>
         </div>
       </div>
@@ -1135,34 +1141,28 @@ function MetricRow({ label, avg, total, unit = "" }: { label: string; avg: strin
   );
 }
 
-// Helper: Custom grid row comparing Team A vs Team B values
-interface CompMetricValue {
-  avg: string;
-  total: string;
-}
+// Helper: Custom grid row comparing Team A vs Team B match average values
+function MetricCompRow({ label, valA, valB }: { label: string; valA: string; valB: string }) {
+  const numA = Number(valA);
+  const numB = Number(valB);
 
-function CompMetricRow({ label, A, B, unit = "" }: { label: string; A: CompMetricValue; B: CompMetricValue; unit?: string }) {
-  const numA = Number(A.avg);
-  const numB = Number(B.avg);
-
-  // Styling highlight for the better performing team
   const isABetter = numA > numB;
   const isBBetter = numB > numA;
 
   return (
-    <div className="grid grid-cols-4 text-xs font-sans text-slate-300 py-2 px-4 hover:bg-slate-800/40 transition-colors">
-      <div className="col-span-2 font-medium text-slate-300">{label}</div>
-      <div className="text-center font-mono flex items-center justify-center gap-1">
-        <span className={isABetter ? "text-cyan-400 font-extrabold" : "text-slate-300 font-medium"}>
-          {A.avg}{unit}
+    <div className="grid grid-cols-3 text-xs font-sans text-gray-200 py-2.5 px-4 hover:bg-gray-800/50 transition-colors border-b border-gray-800/40 last:border-0 text-center">
+      <div className="font-mono text-sm font-bold flex items-center justify-center">
+        <span className={isABetter ? "text-cyan-400 font-extrabold" : "text-gray-300 font-medium"}>
+          {valA}
         </span>
-        <span className="text-[10px] text-slate-500">({A.total})</span>
       </div>
-      <div className="text-center font-mono flex items-center justify-center gap-1 border-l border-slate-800">
-        <span className={isBBetter ? "text-rose-400 font-extrabold" : "text-slate-300 font-medium"}>
-          {B.avg}{unit}
+      <div className="font-bold text-gray-200 uppercase tracking-wider text-xs flex items-center justify-center">
+        {label}
+      </div>
+      <div className="font-mono text-sm font-bold flex items-center justify-center">
+        <span className={isBBetter ? "text-rose-400 font-extrabold" : "text-gray-300 font-medium"}>
+          {valB}
         </span>
-        <span className="text-[10px] text-slate-500">({B.total})</span>
       </div>
     </div>
   );
