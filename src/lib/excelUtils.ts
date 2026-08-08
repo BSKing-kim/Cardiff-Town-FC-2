@@ -546,7 +546,7 @@ export const parseMatchFixturesExcel = async (file: File): Promise<{ count: numb
 };
 
 // Explicit standalone parser for Individual Player Stats (player_stats table)
-export const parsePlayerStatsExcel = async (file: File): Promise<{ count: number; data: any[] }> => {
+export const parsePlayerStatsExcel = async (file: File, matchIdOverride?: string): Promise<{ count: number; data: any[] }> => {
   if (!file) {
     throw new Error("No file provided for Player Stats Excel upload.");
   }
@@ -590,16 +590,21 @@ export const parsePlayerStatsExcel = async (file: File): Promise<{ count: number
   // Build schema-exact payload for public.player_stats — ONLY columns confirmed to exist in the table
   const sanitizedRows = rawRows.map(row => {
     const playerName   = extractString(row, ['player_name', 'Player Name', 'Name', 'name', 'username', 'Username', '선수명']);
-    const matchId      = extractString(row, ['match_id', 'Match ID', 'Game ID', 'Match', '매치ID']) || 'M01';
+    // matchIdOverride from the match-selector takes precedence over the row's own match_id
+    const rowMatchId   = extractString(row, ['match_id', 'Match ID', 'Game ID', 'Match', '매치ID']) || 'M01';
+    const matchId      = (matchIdOverride && matchIdOverride.trim()) ? matchIdOverride.trim() : rowMatchId;
 
     if (!playerName && !matchId) return null;
+
+    const pNum = Number(extractInt(row, ['player_number', 'Number', 'Jersey', 'Shirt', '등번호'])) || 0;
 
     // Sanitize every field as Number to prevent type errors or schema mismatches
     // Dual player_name / name mapping — Supabase accepts whichever column exists
     const nameVal = String(playerName).trim();
     const cleanPayload = {
-      id:             String(`${matchId}_${nameVal.toLowerCase().replace(/[^a-z0-9]/g, '_') || extractInt(row, ['player_number', 'Number', 'Jersey', 'Shirt', '등번호'])}`).trim(),
-      match_id:       String(matchId).trim(),
+      // PK: selectedMatchId_playerNumber (or playerName as fallback)
+      id:             `${matchId}_${pNum || nameVal.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+      match_id:       matchId,
       player_name:    nameVal,           // primary column name
       name:           nameVal,           // dual fallback for schema compatibility
       player_number:  Number(extractInt(row, ['player_number', 'Number', 'Jersey', 'Shirt', '등번호'])) || 0,
@@ -1200,45 +1205,34 @@ export class ExcelUtils {
   }
 
   // 1. Download Player Performance Template (Player_Performance_Template.xlsx) - RAW count fields ONLY, NO percentage columns!
-  static downloadPlayerPerformanceTemplate(): void {
+  static downloadPlayerPerformanceTemplate(matchId = 'M01'): void {
     const headers = [
-      "username",
       "match_id",
+      "player_name",
+      "player_number",
+      "position",
+      "minutes_played",
       "goals",
+      "assists",
       "shots",
       "shots_on_target",
       "passes",
       "successful_passes",
-      "backwards_passes",
-      "forwards_passes",
-      "long_passes",
-      "successful_long_passes",
       "key_passes",
-      "successful_key_passes",
+      "long_passes",
       "through_balls",
-      "successful_through_balls",
       "crosses",
-      "successful_crosses",
       "dribbles",
       "successful_dribbles",
       "duels",
       "duels_won",
-      "aerial_duels",
-      "aerial_duels_won",
-      "ground_duels",
-      "ground_duels_won",
-      "ball_recoveries",
       "tackles",
       "tackles_won",
       "interceptions",
       "clearances",
       "blocks",
-      "own_goals",
+      "ball_recoveries",
       "turnovers",
-      "miscontrols",
-      "unsuccessful_dribbles",
-      "possession_lost",
-      "offsides",
       "fouls",
       "yellow_cards",
       "red_cards"
@@ -1246,85 +1240,63 @@ export class ExcelUtils {
 
     const sampleRows = [
       {
-        "username": "liam_davies",
-        "match_id": "M01",
+        "match_id": matchId,
+        "player_name": "Liam Davies",
+        "player_number": 9,
+        "position": "CF",
+        "minutes_played": 90,
         "goals": 1,
+        "assists": 0,
         "shots": 4,
         "shots_on_target": 3,
         "passes": 28,
         "successful_passes": 22,
-        "backwards_passes": 6,
-        "forwards_passes": 16,
-        "long_passes": 4,
-        "successful_long_passes": 3,
         "key_passes": 3,
-        "successful_key_passes": 2,
+        "long_passes": 4,
         "through_balls": 2,
-        "successful_through_balls": 1,
         "crosses": 3,
-        "successful_crosses": 2,
         "dribbles": 4,
         "successful_dribbles": 3,
         "duels": 12,
         "duels_won": 7,
-        "aerial_duels": 5,
-        "aerial_duels_won": 3,
-        "ground_duels": 7,
-        "ground_duels_won": 4,
-        "ball_recoveries": 5,
         "tackles": 3,
         "tackles_won": 2,
         "interceptions": 2,
         "clearances": 1,
         "blocks": 1,
-        "own_goals": 0,
+        "ball_recoveries": 5,
         "turnovers": 2,
-        "miscontrols": 1,
-        "unsuccessful_dribbles": 1,
-        "possession_lost": 3,
-        "offsides": 1,
         "fouls": 1,
         "yellow_cards": 0,
         "red_cards": 0
       },
       {
-        "username": "gethin_vaughan",
-        "match_id": "M01",
+        "match_id": matchId,
+        "player_name": "Gethin Vaughan",
+        "player_number": 6,
+        "position": "CM",
+        "minutes_played": 90,
         "goals": 0,
+        "assists": 1,
         "shots": 2,
         "shots_on_target": 1,
         "passes": 52,
         "successful_passes": 46,
-        "backwards_passes": 12,
-        "forwards_passes": 34,
-        "long_passes": 6,
-        "successful_long_passes": 5,
         "key_passes": 5,
-        "successful_key_passes": 4,
+        "long_passes": 6,
         "through_balls": 3,
-        "successful_through_balls": 2,
         "crosses": 2,
-        "successful_crosses": 1,
         "dribbles": 3,
         "successful_dribbles": 2,
         "duels": 14,
         "duels_won": 9,
-        "aerial_duels": 4,
-        "aerial_duels_won": 2,
-        "ground_duels": 10,
-        "ground_duels_won": 7,
-        "ball_recoveries": 8,
         "tackles": 5,
         "tackles_won": 4,
         "interceptions": 3,
         "clearances": 2,
         "blocks": 0,
-        "own_goals": 0,
+        "ball_recoveries": 8,
         "turnovers": 1,
-        "miscontrols": 1,
-        "unsuccessful_dribbles": 1,
-        "possession_lost": 2,
-        "offsides": 0,
         "fouls": 2,
         "yellow_cards": 1,
         "red_cards": 0
@@ -1334,7 +1306,7 @@ export class ExcelUtils {
     const worksheet = XLSX.utils.json_to_sheet(sampleRows, { header: headers });
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Player_Performance");
-    XLSX.writeFile(workbook, "Player_Performance_Template.xlsx");
+    XLSX.writeFile(workbook, `Player_Performance_${matchId}.xlsx`);
   }
 
   static downloadPlayerStatsTemplate(): void {
