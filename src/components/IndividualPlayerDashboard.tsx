@@ -29,12 +29,49 @@ export default function IndividualPlayerDashboard({
   const [pendingReq, setPendingReq] = useState<ProfileUpdateRequest | null>(null);
   const [editSubmittedToast, setEditSubmittedToast] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [editForm, setEditForm] = useState({
     position: "CM",
-    nationality: "Wales",
+    nationality: "",
     preferredFoot: "Right",
     squadNumber: ""
   });
+
+  useEffect(() => {
+    async function loadLatestProfile() {
+      const targetPlayerObj = selectedPlayer || player;
+      const targetUserId = targetPlayerObj?.id && targetPlayerObj.id !== "unlinked-profile"
+        ? targetPlayerObj.id
+        : ((targetPlayerObj as any)?.player_id || (targetPlayerObj as any)?.user_id || (targetPlayerObj as any)?.playerId || currentUser?.id);
+
+      const targetUsername = targetPlayerObj?.username || (targetPlayerObj as any)?.player_name || targetPlayerObj?.name || currentUser?.username;
+
+      if (!targetUserId && !targetUsername) return;
+
+      try {
+        let query = (supabase.from('profiles') as any).select('*');
+        if (targetUserId) {
+          query = query.or(`id.eq.${targetUserId},user_id.eq.${targetUserId},player_id.eq.${targetUserId}`);
+        } else if (targetUsername) {
+          query = query.eq('username', targetUsername);
+        }
+
+        const { data, error } = await query.maybeSingle();
+        if (!error && data) {
+          console.log("Loaded live profile from public.profiles in IndividualPlayerDashboard:", data);
+          setUserProfile(data);
+        }
+      } catch (err) {
+        console.warn("Error loading live profile:", err);
+      }
+    }
+
+    loadLatestProfile();
+  }, [
+    selectedPlayer?.id, (selectedPlayer as any)?.player_id, (selectedPlayer as any)?.user_id, selectedPlayer?.username,
+    player?.id, (player as any)?.player_id, (player as any)?.user_id, player?.username,
+    currentUser?.id, currentUser?.username
+  ]);
 
   const fetchProfileAndPendingRequests = async () => {
     const userId = currentUser?.id || currentUser?.user_id || currentUser?.username;
@@ -533,27 +570,33 @@ export default function IndividualPlayerDashboard({
 
   const targetPlayer = selectedPlayer || player;
 
-  const position = targetPlayer
-    ? (targetPlayer.position || (targetPlayer as any).primary_position || activePlayerObj.position || "-")
-    : ((currentUser as any)?.position || activePlayerObj.position || "-");
+  const position = userProfile?.position ||
+    (targetPlayer
+      ? (targetPlayer.position || (targetPlayer as any).primary_position || activePlayerObj.position || "-")
+      : ((currentUser as any)?.position || activePlayerObj.position || "-"));
 
-  const nationality = targetPlayer
-    ? (targetPlayer.nationality || (targetPlayer as any).country || activePlayerObj.nationality || "-")
-    : ((currentUser as any)?.nationality || activePlayerObj.nationality || "-");
+  const nationality = userProfile?.nationality || userProfile?.country ||
+    (targetPlayer
+      ? (targetPlayer.nationality || (targetPlayer as any).country || (activePlayerObj.nationality !== "Wales" ? activePlayerObj.nationality : "") || "-")
+      : ((currentUser as any)?.nationality || (activePlayerObj.nationality !== "Wales" ? activePlayerObj.nationality : "") || "-"));
 
-  const preferredFoot = targetPlayer
-    ? (targetPlayer.preferred_foot || targetPlayer.preferredFoot || (targetPlayer as any).foot || activePlayerObj.preferredFoot || "-")
-    : ((currentUser as any)?.preferred_foot || (currentUser as any)?.preferredFoot || activePlayerObj.preferredFoot || "-");
+  const preferredFoot = userProfile?.preferred_foot || userProfile?.preferredFoot ||
+    (targetPlayer
+      ? (targetPlayer.preferred_foot || targetPlayer.preferredFoot || (targetPlayer as any).foot || activePlayerObj.preferredFoot || "-")
+      : ((currentUser as any)?.preferred_foot || (currentUser as any)?.preferredFoot || activePlayerObj.preferredFoot || "-"));
 
-  const backNumberVal = targetPlayer
-    ? (targetPlayer.squad_number || targetPlayer.player_number || targetPlayer.backNumber || targetPlayer.back_number || (targetPlayer as any).number || (activePlayerObj.backNumber ? String(activePlayerObj.backNumber) : "-"))
-    : ((currentUser as any)?.squad_number || (currentUser as any)?.squadNumber || (currentUser as any)?.back_number || (currentUser as any)?.backNumber || (activePlayerObj.backNumber ? String(activePlayerObj.backNumber) : "N/A"));
+  const rawBackNum = userProfile?.squad_number || userProfile?.player_number || userProfile?.back_number ||
+    (targetPlayer
+      ? (targetPlayer.squad_number || targetPlayer.player_number || targetPlayer.backNumber || targetPlayer.back_number || (targetPlayer as any).number || (activePlayerObj.backNumber ? String(activePlayerObj.backNumber) : "-"))
+      : ((currentUser as any)?.squad_number || (currentUser as any)?.squadNumber || (currentUser as any)?.back_number || (currentUser as any)?.backNumber || (activePlayerObj.backNumber ? String(activePlayerObj.backNumber) : "N/A")));
+
+  const backNumberVal = (rawBackNum !== "N/A" && rawBackNum !== "-") ? String(rawBackNum) : "N/A";
 
   const handleOpenEditModal = () => {
     setEditForm({
-      position: position || "CM",
-      nationality: nationality || "Wales",
-      preferredFoot: preferredFoot || "Right",
+      position: position !== "-" ? position : "CM",
+      nationality: nationality !== "-" ? nationality : "",
+      preferredFoot: preferredFoot !== "-" ? preferredFoot : "Right",
       squadNumber: backNumberVal !== "N/A" ? backNumberVal : ""
     });
     setShowEditModal(true);

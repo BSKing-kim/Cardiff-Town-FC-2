@@ -121,7 +121,7 @@ export default function PlayerStats({ players, onPlayersUpdated, currentUser, ma
               squad_number: Number(squadNum),
               player_number: Number(squadNum),
               preferredFoot: prof.preferred_foot || "Right",
-              nationality: prof.nationality || "Wales",
+              nationality: prof.nationality || "-",
               joinDate: createdAt,
               dob: prof.dob || "-",
               playerId: pId,

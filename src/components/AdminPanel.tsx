@@ -493,7 +493,7 @@ export default function AdminPanel({
                       {prof.preferred_foot || "Right"}
                     </td>
                     <td className="py-3 px-4 text-slate-400">
-                      {prof.nationality || "Wales"}
+                      {prof.nationality || "-"}
                     </td>
                     <td className="py-3 px-4 text-amber-400 font-semibold">
                       {prof.role || "CCFL First"}
@@ -519,7 +519,7 @@ export default function AdminPanel({
                         {p.preferredFoot || "Right"}
                       </td>
                       <td className="py-3 px-4 text-slate-400">
-                        {p.nationality || "Wales"}
+                        {p.nationality || "-"}
                       </td>
                       <td className="py-3 px-4 text-amber-400 font-semibold">
                         {p.division || "CCFL First"}
