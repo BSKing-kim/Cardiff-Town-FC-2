@@ -256,6 +256,7 @@ export default function PlayerStats({ players, onPlayersUpdated, currentUser, ma
         </button>
         <IndividualPlayerDashboard 
           player={activePlayer} 
+          selectedPlayer={activePlayer}
           currentUser={currentUser} 
           matches={matches} 
           onClose={() => setActivePlayer(null)}

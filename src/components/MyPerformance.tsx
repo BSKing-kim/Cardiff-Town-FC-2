@@ -6,6 +6,8 @@ import { UserCheck, ShieldCheck, Footprints, Compass, Sparkles, CheckCircle2, Lo
 
 interface MyPerformanceProps {
   currentUser?: UserProfile | null;
+  selectedPlayer?: Player | UserProfile | any | null;
+  player?: Player | UserProfile | any | null;
   players?: Player[];
   matches?: MatchData[];
 }
@@ -25,7 +27,7 @@ const POSITIONS = [
 
 const FEET = ["Right", "Left", "Both"];
 
-export default function MyPerformance({ currentUser, players = [], matches = [] }: MyPerformanceProps) {
+export default function MyPerformance({ currentUser, selectedPlayer, player, players = [], matches = [] }: MyPerformanceProps) {
   const [myLogs, setMyLogs] = useState<any[]>([]);
   const [assignedPlayerId, setAssignedPlayerId] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -39,69 +41,52 @@ export default function MyPerformance({ currentUser, players = [], matches = [] 
   const [isSubmittingOnboarding, setIsSubmittingOnboarding] = useState<boolean>(false);
   const [userProfileData, setUserProfileData] = useState<any>(null);
 
+  const activeTarget = selectedPlayer || player || currentUser;
+
   useEffect(() => {
     let isMounted = true;
 
-    const loadMyPerformance = async () => {
+    const loadPerformanceForTarget = async () => {
       setLoading(true);
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        const targetUserId = currentUser?.id || user?.id || (currentUser as any)?.user_id;
+        const targetPlayerId = activeTarget?.id && activeTarget.id !== "unlinked-profile"
+          ? activeTarget.id
+          : ((activeTarget as any)?.player_id || (activeTarget as any)?.user_id || (activeTarget as any)?.playerId);
 
-        let profilePlayerId: string | null = currentUser?.playerId || (currentUser as any)?.player_id || null;
-        let profileName = `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim() || currentUser?.username;
-        let dbProfile: any = null;
+        const targetPlayerName = (activeTarget as any)?.full_name || activeTarget?.name || (activeTarget as any)?.username || (activeTarget?.firstName ? `${activeTarget.firstName} ${activeTarget.lastName}`.trim() : '');
+        const targetPlayerNum = Number((activeTarget as any)?.squad_number || (activeTarget as any)?.player_number || (activeTarget as any)?.backNumber || 0);
+
+        console.log("Fetching stats for target player in MyPerformance:", { targetPlayerId, targetPlayerName, targetPlayerNum });
+
+        let profilePlayerId: string | null = targetPlayerId || null;
+        let profileName = targetPlayerName;
 
         const isStaffUser = currentUser?.role !== UserRole.Player || !!currentUser?.isAdmin;
 
-        if (targetUserId || currentUser?.username) {
-          // Fetch latest user profile row from Supabase
+        if (targetPlayerId || targetPlayerName) {
           let profileQuery = (supabase.from('profiles') as any).select('*');
-          if (targetUserId) {
-            profileQuery = profileQuery.or(`id.eq.${targetUserId},user_id.eq.${targetUserId}`);
-          } else if (currentUser?.username) {
-            profileQuery = profileQuery.eq('username', currentUser.username);
+          if (targetPlayerId) {
+            profileQuery = profileQuery.or(`id.eq.${targetPlayerId},user_id.eq.${targetPlayerId},player_id.eq.${targetPlayerId}`);
+          } else if (targetPlayerName) {
+            profileQuery = profileQuery.or(`username.eq.${targetPlayerName},full_name.ilike.%${targetPlayerName}%`);
           }
 
           const { data: profile } = await profileQuery.maybeSingle();
 
           if (profile) {
-            dbProfile = profile;
             setUserProfileData(profile);
+            if (profile.player_id) profilePlayerId = profile.player_id;
+            if (profile.full_name) profileName = profile.full_name;
 
-            if (profile.player_id) {
-              profilePlayerId = profile.player_id;
-            }
-            if (profile.full_name) {
-              profileName = profile.full_name;
-            }
-
-            // Check onboarding modal visibility rule:
-            // IF is_onboarded === true OR onboarding_completed === true OR (position and nationality exist): DO NOT show modal
             const isCompleted = profile.is_onboarded === true || 
                                 profile.onboarding_completed === true || 
                                 (!!profile.position && !!profile.nationality);
 
-            if (!isStaffUser && !isCompleted) {
+            if (!isStaffUser && !isCompleted && (!selectedPlayer && !player)) {
               if (isMounted) setNeedsOnboarding(true);
             } else {
               if (isMounted) setNeedsOnboarding(false);
             }
-          } else {
-            // New user registration without DB profile yet -> prompt onboarding for Players
-            if (!isStaffUser && isMounted) setNeedsOnboarding(true);
-          }
-        } else {
-          const isUserCompleted = (currentUser as any)?.is_onboarded === true ||
-                                  (currentUser as any)?.onboarding_completed === true ||
-                                  currentUser?.isOnboarded === true ||
-                                  currentUser?.is_onboarded === true ||
-                                  (!!currentUser?.position && !!currentUser?.nationality);
-
-          if (!isStaffUser && !isUserCompleted) {
-            if (isMounted) setNeedsOnboarding(true);
-          } else {
-            if (isMounted) setNeedsOnboarding(false);
           }
         }
 
@@ -109,49 +94,65 @@ export default function MyPerformance({ currentUser, players = [], matches = [] 
           setAssignedPlayerId(profilePlayerId);
         }
 
-        const uName = currentUser?.username;
-        const pId = profilePlayerId || targetUserId || currentUser?.id;
-        const fName = profileName || (currentUser ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() : '');
+        // Query player_stats strictly for the target player
+        let query = (supabase.from('player_stats') as any).select('*');
 
-        let conditions: string[] = [];
-        if (pId) {
-          conditions.push(`player_id.eq.${pId}`, `user_id.eq.${pId}`, `id.eq.${pId}`);
-        }
-        if (uName) {
-          conditions.push(`username.eq.${uName}`);
-        }
-        if (fName) {
-          conditions.push(`player_name.eq.${fName}`, `name.eq.${fName}`);
-        }
-
-        if (conditions.length > 0) {
-          // Query public.player_stats with flexible OR condition for instant matching
-          const { data: statsData } = await (supabase.from('player_stats') as any)
-            .select('*')
-            .or(conditions.join(','));
-
-          if (isMounted && Array.isArray(statsData) && statsData.length > 0) {
-            setMyLogs(statsData);
+        if (targetPlayerId && targetPlayerId !== "unlinked-profile") {
+          query = query.or(
+            `player_id.eq.${targetPlayerId},user_id.eq.${targetPlayerId},username.ilike.%${targetPlayerName}%,player_name.ilike.%${targetPlayerName}%`
+          );
+        } else if (targetPlayerName) {
+          if (targetPlayerNum > 0) {
+            query = query.or(
+              `username.ilike.%${targetPlayerName}%,player_name.ilike.%${targetPlayerName}%,player_number.eq.${targetPlayerNum}`
+            );
           } else {
-            // Fallback search in match_logs
-            const { data: matchLogs } = await (supabase.from('match_logs') as any)
-              .select('*')
-              .or(conditions.join(','));
-            if (isMounted && Array.isArray(matchLogs)) {
-              setMyLogs(matchLogs);
-            }
+            query = query.or(
+              `username.ilike.%${targetPlayerName}%,player_name.ilike.%${targetPlayerName}%`
+            );
           }
         }
+
+        const { data: playerMatchStats, error } = await query.order('created_at', { ascending: true });
+
+        if (error) {
+          console.error("Error fetching player stats:", error);
+          let logsQuery = (supabase.from('match_logs') as any).select('*');
+          if (targetPlayerId && targetPlayerId !== "unlinked-profile") {
+            logsQuery = logsQuery.or(`player_id.eq.${targetPlayerId},player_name.ilike.%${targetPlayerName}%`);
+          } else if (targetPlayerName) {
+            logsQuery = logsQuery.ilike('player_name', `%${targetPlayerName}%`);
+          }
+          const { data: logs } = await logsQuery;
+          if (isMounted && logs) setMyLogs(logs);
+        } else if (playerMatchStats && playerMatchStats.length > 0) {
+          console.log("Loaded stats for target player:", playerMatchStats);
+          if (isMounted) setMyLogs(playerMatchStats);
+        } else {
+          // Fallback search in match_logs if player_stats is empty
+          let logsQuery = (supabase.from('match_logs') as any).select('*');
+          if (targetPlayerId && targetPlayerId !== "unlinked-profile") {
+            logsQuery = logsQuery.or(`player_id.eq.${targetPlayerId},player_name.ilike.%${targetPlayerName}%`);
+          } else if (targetPlayerName) {
+            logsQuery = logsQuery.ilike('player_name', `%${targetPlayerName}%`);
+          }
+          const { data: logs } = await logsQuery;
+          if (isMounted && logs) setMyLogs(logs);
+        }
       } catch (err) {
-        console.warn("Error loading my performance:", err);
+        console.warn("Error loading performance for target player:", err);
       } finally {
         if (isMounted) setLoading(false);
       }
     };
 
-    loadMyPerformance();
+    loadPerformanceForTarget();
     return () => { isMounted = false; };
-  }, [currentUser?.id, currentUser?.username]);
+  }, [
+    selectedPlayer?.id, (selectedPlayer as any)?.player_id, (selectedPlayer as any)?.user_id, selectedPlayer?.username, (selectedPlayer as any)?.full_name, selectedPlayer?.name,
+    player?.id, (player as any)?.player_id, (player as any)?.user_id, player?.username, (player as any)?.full_name, player?.name,
+    currentUser?.id, currentUser?.username
+  ]);
 
   const handleCompleteOnboarding = async () => {
     setIsSubmittingOnboarding(true);

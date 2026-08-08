@@ -6,7 +6,8 @@ import { Shield, Clock, BarChart2, List, Lock, Footprints, Flag, Edit3, UserChec
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
 
 interface IndividualPlayerDashboardProps {
-  player?: Player | null;
+  player?: Player | any | null;
+  selectedPlayer?: Player | any | null;
   currentUser?: UserProfile | null;
   matches?: MatchData[];
   onClose?: () => void;
@@ -15,6 +16,7 @@ interface IndividualPlayerDashboardProps {
 
 export default function IndividualPlayerDashboard({
   player,
+  selectedPlayer,
   currentUser,
   matches = [],
   onClose,
@@ -105,38 +107,79 @@ export default function IndividualPlayerDashboard({
   const [fetchedPlayerStats, setFetchedPlayerStats] = useState<any[]>([]);
 
   useEffect(() => {
-    const loadPlayerStatsFromDb = async () => {
-      const pId = player?.id || (currentUser as any)?.playerId || (currentUser as any)?.player_id || currentUser?.id;
-      const uName = (player as any)?.username || currentUser?.username;
-      const pName = player?.name || (player as any)?.full_name || (currentUser ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() : '');
+    const fetchStatsForPlayer = async () => {
+      const targetPlayer = selectedPlayer || player;
+      if (!targetPlayer) return;
 
-      let conditions: string[] = [];
-      if (pId) conditions.push(`player_id.eq.${pId}`, `user_id.eq.${pId}`, `id.eq.${pId}`);
-      if (uName) conditions.push(`username.eq.${uName}`);
-      if (pName) conditions.push(`player_name.eq.${pName}`, `name.eq.${pName}`);
+      const targetPlayerId = targetPlayer.id && targetPlayer.id !== "unlinked-profile"
+        ? targetPlayer.id
+        : ((targetPlayer as any).player_id || (targetPlayer as any).user_id || (targetPlayer as any).playerId);
 
-      if (conditions.length > 0) {
-        try {
-          const { data } = await (supabase.from('player_stats') as any)
-            .select('*')
-            .or(conditions.join(','));
+      const targetPlayerName = targetPlayer.name || (targetPlayer as any).full_name || (targetPlayer as any).username || '';
+      const targetPlayerNum = Number((targetPlayer as any).squad_number || (targetPlayer as any).player_number || targetPlayer.backNumber || 0);
 
-          if (Array.isArray(data) && data.length > 0) {
-            setFetchedPlayerStats(data);
-          } else {
-            const { data: mlData } = await (supabase.from('match_logs') as any)
-              .select('*')
-              .or(conditions.join(','));
-            if (Array.isArray(mlData)) setFetchedPlayerStats(mlData);
-          }
-        } catch (e) {
-          console.warn("Could not fetch player_stats in dashboard:", e);
+      console.log("Fetching stats for target player in IndividualPlayerDashboard:", { targetPlayerId, targetPlayerName, targetPlayerNum });
+
+      let query = (supabase.from('player_stats') as any).select('*');
+
+      if (targetPlayerId && targetPlayerId !== "unlinked-profile") {
+        // Try matching player_id, user_id, username, or player_name/number
+        query = query.or(
+          `player_id.eq.${targetPlayerId},user_id.eq.${targetPlayerId},username.ilike.%${targetPlayerName}%,player_name.ilike.%${targetPlayerName}%`
+        );
+      } else if (targetPlayerName) {
+        if (targetPlayerNum > 0) {
+          query = query.or(
+            `username.ilike.%${targetPlayerName}%,player_name.ilike.%${targetPlayerName}%,player_number.eq.${targetPlayerNum}`
+          );
+        } else {
+          query = query.or(
+            `username.ilike.%${targetPlayerName}%,player_name.ilike.%${targetPlayerName}%`
+          );
         }
+      } else {
+        return;
+      }
+
+      try {
+        const { data: playerMatchStats, error } = await query.order('created_at', { ascending: true });
+
+        if (error) {
+          console.error("Error fetching player stats:", error);
+        } else if (playerMatchStats && playerMatchStats.length > 0) {
+          console.log("Loaded stats for target player in IndividualPlayerDashboard:", playerMatchStats);
+          setFetchedPlayerStats(playerMatchStats);
+        } else {
+          // Fallback search in match_logs
+          let logsQuery = (supabase.from('match_logs') as any).select('*');
+          if (targetPlayerId && targetPlayerId !== "unlinked-profile") {
+            logsQuery = logsQuery.or(`player_id.eq.${targetPlayerId},player_name.ilike.%${targetPlayerName}%`);
+          } else if (targetPlayerName) {
+            logsQuery = logsQuery.ilike('player_name', `%${targetPlayerName}%`);
+          }
+          const { data: logs } = await logsQuery;
+          if (logs) setFetchedPlayerStats(logs);
+        }
+      } catch (e) {
+        console.warn("Exception fetching player stats:", e);
       }
     };
 
-    loadPlayerStatsFromDb();
-  }, [player, currentUser]);
+    fetchStatsForPlayer();
+  }, [
+    selectedPlayer?.id,
+    (selectedPlayer as any)?.player_id,
+    (selectedPlayer as any)?.user_id,
+    (selectedPlayer as any)?.username,
+    (selectedPlayer as any)?.full_name,
+    selectedPlayer?.name,
+    player?.id,
+    (player as any)?.player_id,
+    (player as any)?.user_id,
+    (player as any)?.username,
+    (player as any)?.full_name,
+    player?.name
+  ]);
 
   const aggregatedStats = useMemo(() => {
     if (!fetchedPlayerStats || fetchedPlayerStats.length === 0) return null;
