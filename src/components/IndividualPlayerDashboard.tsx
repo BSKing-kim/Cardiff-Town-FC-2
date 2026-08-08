@@ -839,7 +839,7 @@ export default function IndividualPlayerDashboard({
       </div>
 
       {/* 3. Performance Trend Graph (Recent Matches) */}
-      <div className="bg-[#1e293b] border border-[#334155] rounded-2xl p-5 sm:p-6 shadow-lg space-y-4">
+      <div className="bg-[#1e293b] border border-[#334155] rounded-2xl p-5 sm:p-6 shadow-lg space-y-4 w-full max-w-full overflow-hidden">
         <div className="flex items-center justify-between border-b border-[#334155] pb-3">
           <div className="flex items-center gap-2.5">
             <BarChart2 className="h-5 w-5 text-[#eab308]" />
@@ -890,6 +890,7 @@ export default function IndividualPlayerDashboard({
                 />
                 <Legend 
                   wrapperStyle={{ paddingTop: "12px", fontSize: "11px", fontWeight: "bold" }}
+                  className="flex flex-wrap justify-center gap-2 text-xs md:text-sm"
                 />
                 <Line 
                   type="monotone" 
@@ -938,7 +939,7 @@ export default function IndividualPlayerDashboard({
       </div>
 
       {/* 4. Detailed Performance Metrics (6 Category Card Grids) */}
-      <div className="bg-[#1e293b] border border-[#334155] rounded-2xl p-5 sm:p-6 shadow-lg space-y-5">
+      <div className="bg-[#1e293b] border border-[#334155] rounded-2xl p-5 sm:p-6 shadow-lg space-y-5 w-full max-w-full overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#334155] pb-3 gap-3">
           <div className="flex items-center gap-2.5">
             <List className="h-5 w-5 text-[#10b981]" />
@@ -947,11 +948,11 @@ export default function IndividualPlayerDashboard({
             </h3>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <select
               value={selectedMatchFilter}
               onChange={(e) => setSelectedMatchFilter(e.target.value)}
-              className="bg-[#0b0f19] border border-[#334155] text-[#94a3b8] text-xs font-mono font-bold rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#eab308] cursor-pointer"
+              className="w-full bg-[#0b0f19] border border-[#334155] text-[#94a3b8] text-xs font-mono font-bold rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#eab308] cursor-pointer"
             >
               <option value="all">All Matches (Aggregated)</option>
               {trendData.map((m, idx) => (

@@ -168,7 +168,10 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
     fixtures.forEach(f => {
       if (f.division) set.add(f.division);
     });
-    return Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b));
+    return Array.from(set)
+      .filter(Boolean)
+      .filter(div => !div.toLowerCase().includes("friendly"))
+      .sort((a, b) => a.localeCompare(b));
   }, [customTeams, fixtures]);
 
   // Compute filtered teams belonging to the currently selected formDivision (for League matches)
@@ -818,69 +821,50 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
         </form>
       )}
 
-      {/* Filter Tabs */}
-      <div className="flex flex-col gap-3 border-b border-[#334155] pb-3" id="fixture-filter-tabs">
-        {/* Match Type Filter */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[11px] font-extrabold uppercase text-[#94a3b8] mr-1 flex items-center gap-1">
-              <Filter className="h-3 w-3 text-[#eab308]" /> Filter:
-            </span>
-            {[
-              { id: "All", label: "All Matches" },
-              { id: "League", label: "League Matches" },
-              { id: "Cup", label: "Cup Matches" },
-              { id: "Friendly", label: "Friendly Matches" },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setActiveFilter(tab.id as any);
-                  if (tab.id !== "League" && tab.id !== "All") {
-                    setActiveDivisionFilter("All");
-                  }
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeFilter === tab.id 
-                    ? "bg-[#eab308] text-[#0b0f19] font-black shadow-md" 
-                    : "bg-[#1e293b] text-[#94a3b8] hover:text-white border border-[#334155]"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+      {/* Filter Dropdowns Container */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 bg-[#1e293b] border border-[#334155] p-4 rounded-2xl shadow-md font-sans" id="fixture-filter-tabs">
+        {/* Match Type Filter Dropdown */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+          <label className="text-xs font-bold text-[#94a3b8] uppercase flex items-center gap-1.5 shrink-0">
+            <Filter className="h-3.5 w-3.5 text-[#eab308]" />
+            <span>Filter:</span>
+          </label>
+          <select 
+            value={activeFilter} 
+            onChange={(e) => {
+              const val = e.target.value as any;
+              setActiveFilter(val);
+              if (val !== "League" && val !== "All") {
+                setActiveDivisionFilter("All");
+              }
+            }}
+            className="bg-[#0b0f19] text-white border border-[#334155] rounded-xl px-3.5 py-2 text-xs font-bold focus:outline-none focus:border-[#eab308] cursor-pointer w-full sm:w-auto min-w-[160px]"
+          >
+            <option value="All">All Matches</option>
+            <option value="League">League Matches</option>
+            <option value="Cup">Cup Matches</option>
+            <option value="Friendly">Friendly Matches</option>
+          </select>
         </div>
 
-        {/* Division Sub-Filter (Shown when All Matches or League Matches is selected) */}
-        {(activeFilter === "All" || activeFilter === "League") && availableDivisions.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-[#334155]/50 animate-fadeIn">
-            <span className="text-[11px] font-extrabold uppercase text-[#94a3b8] mr-1">
+        {/* Division Filter Dropdown */}
+        {(activeFilter === "All" || activeFilter === "League") && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+            <label className="text-xs font-bold text-[#94a3b8] uppercase shrink-0">
               Division:
-            </span>
-            <button
-              onClick={() => setActiveDivisionFilter("All")}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeDivisionFilter === "All" 
-                  ? "bg-[#38bdf8] text-[#0b0f19] font-black" 
-                  : "bg-[#0f172a] text-[#94a3b8] hover:text-white border border-[#334155]"
-              }`}
+            </label>
+            <select 
+              value={activeDivisionFilter} 
+              onChange={(e) => setActiveDivisionFilter(e.target.value)}
+              className="bg-[#0b0f19] text-white border border-[#334155] rounded-xl px-3.5 py-2 text-xs font-bold focus:outline-none focus:border-[#38bdf8] cursor-pointer w-full sm:w-auto min-w-[180px]"
             >
-              All Divisions
-            </button>
-            {availableDivisions.map(divName => (
-              <button
-                key={divName}
-                onClick={() => setActiveDivisionFilter(divName)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  activeDivisionFilter === divName 
-                    ? "bg-[#38bdf8] text-[#0b0f19] font-black" 
-                    : "bg-[#0f172a] text-[#94a3b8] hover:text-white border border-[#334155]"
-                }`}
-              >
-                {divName}
-              </button>
-            ))}
+              <option value="All">All Divisions</option>
+              {availableDivisions.map(divName => (
+                <option key={divName} value={divName}>
+                  {divName}
+                </option>
+              ))}
+            </select>
           </div>
         )}
       </div>
