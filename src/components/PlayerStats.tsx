@@ -472,8 +472,11 @@ export default function PlayerStats({ players, onPlayersUpdated, currentUser, ma
                 
                 return (
                   <tr 
-                    key={p.id || idx}
-                    onClick={() => setActivePlayer(isSelected ? null : p)}
+                    key={p?.id || idx}
+                    onClick={() => {
+                      console.log("Selected player clicked in Squad Directory:", p);
+                      if (p) setActivePlayer(isSelected ? null : p);
+                    }}
                     className={`hover:bg-slate-800/60 cursor-pointer transition-colors ${
                       isSelected ? "bg-cyan-950/40 font-semibold text-white" : "text-slate-200"
                     }`}

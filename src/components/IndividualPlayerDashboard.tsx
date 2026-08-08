@@ -108,6 +108,7 @@ export default function IndividualPlayerDashboard({
 
   useEffect(() => {
     const fetchStatsForPlayer = async () => {
+      setFetchedPlayerStats([]);
       const targetPlayer = selectedPlayer || player;
       if (!targetPlayer) return;
 
