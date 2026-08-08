@@ -27,9 +27,13 @@ export type ActiveViewTab =
   | "match-hub"
   | "team-stats"
   | "team-standings"
+  | "league-standing"
   | "fixtures-results"
+  | "fixtures"
   | "roster-players"
+  | "roster"
   | "admin-center"
+  | "admin"
   | "league-table" 
   | "team" 
   | "matches-all" 
@@ -37,6 +41,7 @@ export type ActiveViewTab =
   | "matches-cup" 
   | "matches-friendly" 
   | "players" 
+  | "opponent-analysis"
   | "opponent" 
   | "profile"
   | "setting-profile" 
@@ -45,7 +50,7 @@ export type ActiveViewTab =
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [activeTab, setActiveTab] = useState<ActiveViewTab>("match-hub");
+  const [activeTab, setActiveTab] = useState<ActiveViewTab>("my-performance");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedOpponent, setSelectedOpponent] = useState<string>("league_average");
   const [isMobile, setIsMobile] = useState<boolean>(false);
@@ -104,11 +109,7 @@ export default function App() {
         setCurrentUser(null);
       } else {
         setCurrentUser(user);
-        if (user.role === UserRole.Player) {
-          setActiveTab("my-performance");
-        } else {
-          setActiveTab("match-hub");
-        }
+        setActiveTab("my-performance");
       }
     }
 
@@ -150,14 +151,6 @@ export default function App() {
 
   const isStaffUser = currentUser?.role !== UserRole.Player || !!currentUser?.isAdmin;
 
-  // Route Guard: Redirect Staff users away from 'my-performance' tab to 'roster-players'
-  useEffect(() => {
-    if (!currentUser) return;
-    if (isStaffUser && activeTab === "my-performance") {
-      setActiveTab("roster-players");
-    }
-  }, [activeTab, currentUser, isStaffUser]);
-
   useEffect(() => {
     if (!currentUser) return;
     let targetHash = activeTab as string;
@@ -171,18 +164,14 @@ export default function App() {
 
   const handleLoginSuccess = (user: UserProfile) => {
     setCurrentUser(user);
-    if (user.role === UserRole.Player) {
-      setActiveTab("my-performance");
-    } else {
-      setActiveTab("match-hub");
-    }
+    setActiveTab("my-performance");
     loadStatsData();
   };
 
   const handleLogout = () => {
     DataService.logout();
     setCurrentUser(null);
-    setActiveTab("match-hub");
+    setActiveTab("my-performance");
     if (window.location.hash) {
       window.location.hash = "";
     }
@@ -351,7 +340,64 @@ export default function App() {
               Main Navigation
             </span>
             
-            {isPlayerRole ? (
+            {isStaffUser ? (
+              <>
+                <DrawerButton 
+                  active={activeTab === "my-performance"}
+                  onClick={() => { setActiveTab("my-performance"); setDrawerOpen(false); }}
+                  icon={UserCheck}
+                  label="My Performance"
+                />
+                <DrawerButton 
+                  active={activeTab === "match-hub" || activeTab === "team"}
+                  onClick={() => { setActiveTab("match-hub"); setDrawerOpen(false); }}
+                  icon={TrendingUp}
+                  label="Match Hub"
+                />
+                <DrawerButton 
+                  active={activeTab === "team-stats"}
+                  onClick={() => { setActiveTab("team-stats"); setDrawerOpen(false); }}
+                  icon={BarChart3}
+                  label="Team Stats"
+                />
+                <DrawerButton 
+                  active={activeTab === "team-standings" || activeTab === "league-table" || activeTab === "league-standing"}
+                  onClick={() => { setActiveTab("team-standings"); setDrawerOpen(false); }}
+                  icon={Trophy}
+                  label="League Standings"
+                />
+                <DrawerButton 
+                  active={activeTab === "fixtures-results" || activeTab === "fixtures" || activeTab.startsWith("matches-")}
+                  onClick={() => { setActiveTab("fixtures-results"); setDrawerOpen(false); }}
+                  icon={Calendar}
+                  label="Fixtures & Results"
+                />
+                <DrawerButton 
+                  active={activeTab === "roster-players" || activeTab === "roster" || activeTab === "players"}
+                  onClick={() => { setActiveTab("roster-players"); setDrawerOpen(false); }}
+                  icon={Users}
+                  label="Roster / Players"
+                />
+                <DrawerButton 
+                  active={activeTab === "admin-center" || activeTab === "admin"}
+                  onClick={() => { setActiveTab("admin-center"); setDrawerOpen(false); }}
+                  icon={Sliders}
+                  label="Admin Center"
+                />
+                <DrawerButton 
+                  active={activeTab === "opponent" || activeTab === "opponent-analysis"}
+                  onClick={() => { setSelectedOpponent("league_average"); setActiveTab("opponent"); setDrawerOpen(false); }}
+                  icon={ArrowRightLeft}
+                  label="Opponent Analysis"
+                />
+                <DrawerButton 
+                  active={activeTab === "setting-profile" || activeTab === "profile"}
+                  onClick={() => { setActiveTab("setting-profile"); setDrawerOpen(false); }}
+                  icon={UserCog}
+                  label="Profile"
+                />
+              </>
+            ) : (
               <>
                 <DrawerButton 
                   active={activeTab === "my-performance"}
@@ -372,76 +418,25 @@ export default function App() {
                   label="Team Stats"
                 />
                 <DrawerButton 
-                  active={activeTab === "team-standings" || activeTab === "league-table"}
+                  active={activeTab === "team-standings" || activeTab === "league-table" || activeTab === "league-standing"}
                   onClick={() => { setActiveTab("team-standings"); setDrawerOpen(false); }}
                   icon={Trophy}
                   label="League Standings"
                 />
                 <DrawerButton 
-                  active={activeTab === "fixtures-results" || activeTab.startsWith("matches-")}
+                  active={activeTab === "fixtures-results" || activeTab === "fixtures" || activeTab.startsWith("matches-")}
                   onClick={() => { setActiveTab("fixtures-results"); setDrawerOpen(false); }}
                   icon={Calendar}
                   label="Fixtures & Results"
                 />
                 <DrawerButton 
-                  active={activeTab === "roster-players" || activeTab === "players"}
+                  active={activeTab === "roster-players" || activeTab === "roster" || activeTab === "players"}
                   onClick={() => { setActiveTab("roster-players"); setDrawerOpen(false); }}
                   icon={Users}
                   label="Roster / Players"
                 />
                 <DrawerButton 
-                  active={activeTab === "opponent"}
-                  onClick={() => { setSelectedOpponent("league_average"); setActiveTab("opponent"); setDrawerOpen(false); }}
-                  icon={ArrowRightLeft}
-                  label="Opponent Analysis"
-                />
-                <DrawerButton 
-                  active={activeTab === "setting-profile" || activeTab === "profile"}
-                  onClick={() => { setActiveTab("setting-profile"); setDrawerOpen(false); }}
-                  icon={UserCog}
-                  label="Profile"
-                />
-              </>
-            ) : (
-              <>
-                <DrawerButton 
-                  active={activeTab === "match-hub" || activeTab === "team"}
-                  onClick={() => { setActiveTab("match-hub"); setDrawerOpen(false); }}
-                  icon={TrendingUp}
-                  label="Match Hub"
-                />
-                <DrawerButton 
-                  active={activeTab === "team-stats"}
-                  onClick={() => { setActiveTab("team-stats"); setDrawerOpen(false); }}
-                  icon={BarChart3}
-                  label="Team Stats"
-                />
-                <DrawerButton 
-                  active={activeTab === "team-standings" || activeTab === "league-table"}
-                  onClick={() => { setActiveTab("team-standings"); setDrawerOpen(false); }}
-                  icon={Trophy}
-                  label="League Standings"
-                />
-                <DrawerButton 
-                  active={activeTab === "fixtures-results" || activeTab.startsWith("matches-")}
-                  onClick={() => { setActiveTab("fixtures-results"); setDrawerOpen(false); }}
-                  icon={Calendar}
-                  label="Fixtures & Results"
-                />
-                <DrawerButton 
-                  active={activeTab === "roster-players" || activeTab === "players"}
-                  onClick={() => { setActiveTab("roster-players"); setDrawerOpen(false); }}
-                  icon={Users}
-                  label="Roster / Players"
-                />
-                <DrawerButton 
-                  active={activeTab === "admin-center"}
-                  onClick={() => { setActiveTab("admin-center"); setDrawerOpen(false); }}
-                  icon={Sliders}
-                  label="Admin Center"
-                />
-                <DrawerButton 
-                  active={activeTab === "opponent"}
+                  active={activeTab === "opponent" || activeTab === "opponent-analysis"}
                   onClick={() => { setSelectedOpponent("league_average"); setActiveTab("opponent"); setDrawerOpen(false); }}
                   icon={ArrowRightLeft}
                   label="Opponent Analysis"
@@ -512,7 +507,7 @@ export default function App() {
           <div className="space-y-6">
             
             {/* View routing */}
-            {activeTab === "my-performance" && !isStaffUser && (
+            {activeTab === "my-performance" && (
               <PlayerStats players={players} matches={matches} onPlayersUpdated={() => loadStatsData(true)} currentUser={currentUser} isMyPerformanceView={true} />
             )}
 
@@ -528,19 +523,19 @@ export default function App() {
               <TeamStats matches={matches} currentUser={currentUser} />
             )}
 
-            {(activeTab === "team-standings" || activeTab === "league-table") && (
+            {(activeTab === "team-standings" || activeTab === "league-table" || activeTab === "league-standing") && (
               <LeagueStandings customTeams={customTeams} currentUser={currentUser} onSelectOpponent={handleSelectOpponent} onTeamsUpdated={() => loadStatsData(true)} />
             )}
 
-            {(activeTab === "fixtures-results" || activeTab.startsWith("matches-")) && (
+            {(activeTab === "fixtures-results" || activeTab === "fixtures" || activeTab.startsWith("matches-")) && (
               <MatchFixtures currentUser={currentUser} onSelectOpponent={handleSelectOpponent} defaultFilter="All" onFixturesUpdated={() => loadStatsData(true)} />
             )}
 
-            {(activeTab === "roster-players" || activeTab === "players") && (
+            {(activeTab === "roster-players" || activeTab === "roster" || activeTab === "players") && (
               <PlayerStats players={players} matches={matches} onPlayersUpdated={() => loadStatsData(true)} currentUser={currentUser} />
             )}
 
-            {activeTab === "admin-center" && (
+            {(activeTab === "admin-center" || activeTab === "admin") && (
               <AdminPanel 
                 currentUser={currentUser} 
                 users={allUsers} 
@@ -559,7 +554,7 @@ export default function App() {
               />
             )}
 
-            {activeTab === "opponent" && (
+            {(activeTab === "opponent" || activeTab === "opponent-analysis") && (
               <OpponentAnalysis matches={matches} defaultOpponent={selectedOpponent} customTeams={customTeams} currentUser={currentUser} />
             )}
 
