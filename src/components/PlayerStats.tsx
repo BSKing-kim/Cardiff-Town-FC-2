@@ -107,18 +107,25 @@ export default function PlayerStats({ players, onPlayersUpdated, currentUser, ma
               username: prof.username
             });
           } else {
+            const squadNum = prof.squad_number || prof.player_number || prof.back_number || (playerProfiles.length + 1);
             playerProfiles.push({
               id: pId,
+              user_id: prof.user_id || prof.id,
+              player_id: prof.player_id || prof.id,
+              full_name: prof.full_name || name,
+              player_name: prof.full_name || prof.username || name,
+              username: prof.username || "",
               name: name,
               position: prof.position || "CM",
-              backNumber: (playerProfiles.length + 1).toString(),
+              backNumber: String(squadNum),
+              squad_number: Number(squadNum),
+              player_number: Number(squadNum),
               preferredFoot: prof.preferred_foot || "Right",
               nationality: prof.nationality || "Wales",
               joinDate: createdAt,
               dob: prof.dob || "-",
               playerId: pId,
               userId: prof.user_id,
-              username: prof.username,
               isOnboarded: prof.is_onboarded,
               role: prof.role || "Player"
             } as unknown as Player);

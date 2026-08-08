@@ -258,10 +258,14 @@ export default function MyPerformance({ currentUser, selectedPlayer, player, pla
 
   // Aggregate stats from logs or fallback to matched roster player
   const matchedPlayer: Player | null = useMemo(() => {
-    const userFullName = `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim() || currentUser?.username || "My Performance";
+    const activeTarget = selectedPlayer || player || currentUser;
+    const userFullName = (activeTarget as any)?.full_name || activeTarget?.name || (activeTarget as any)?.username || (currentUser ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() : "Player");
 
     const rosterMatch = players.find(p => 
       p.id === assignedPlayerId || 
+      p.id === activeTarget?.id ||
+      (activeTarget as any)?.player_id === p.id ||
+      (activeTarget as any)?.user_id === p.id ||
       p.name?.toLowerCase() === userFullName.toLowerCase() ||
       p.name?.toLowerCase().includes(userFullName.toLowerCase())
     );

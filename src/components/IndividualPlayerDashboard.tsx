@@ -255,23 +255,23 @@ export default function IndividualPlayerDashboard({
       assists: 0
     };
 
-    if (aggregatedStats) {
+    if (aggregatedStats && fetchedPlayerStats.length > 0) {
       return {
         ...baseObj,
         ...aggregatedStats,
-        goals: baseObj.goals || aggregatedStats.goals,
-        assists: baseObj.assists || aggregatedStats.assists,
-        shots: baseObj.shots || aggregatedStats.shots,
-        shotsOnTarget: baseObj.shotsOnTarget || aggregatedStats.shotsOnTarget,
-        totalPasses: baseObj.totalPasses || aggregatedStats.totalPasses,
-        successfulPasses: baseObj.successfulPasses || aggregatedStats.successfulPasses,
-        minutesPlayed: baseObj.minutesPlayed || aggregatedStats.minutesPlayed,
-        appearances: baseObj.appearances || aggregatedStats.appearances
+        goals: aggregatedStats.goals,
+        assists: aggregatedStats.assists,
+        shots: aggregatedStats.shots,
+        shotsOnTarget: aggregatedStats.shotsOnTarget,
+        totalPasses: aggregatedStats.totalPasses,
+        successfulPasses: aggregatedStats.successfulPasses,
+        minutesPlayed: aggregatedStats.minutesPlayed,
+        appearances: aggregatedStats.appearances
       } as unknown as Player;
     }
 
     return baseObj as unknown as Player;
-  }, [player, currentUser, isUnmatched, aggregatedStats]);
+  }, [player, currentUser, isUnmatched, aggregatedStats, fetchedPlayerStats]);
 
   // Safe value extraction & percentage formula helpers
   const safeVal = (v: any) => {
@@ -344,6 +344,34 @@ export default function IndividualPlayerDashboard({
 
   // Generate Match-by-Match Trend Data for Performance Trend Chart
   const trendData = useMemo(() => {
+    if (fetchedPlayerStats && fetchedPlayerStats.length > 0) {
+      return fetchedPlayerStats.map((row, idx) => {
+        const mShots = safeVal(row.shots);
+        const mSot = safeVal(row.shots_on_target || row.shotsOnTarget);
+        const mPasses = safeVal(row.passes || row.total_passes || row.totalPasses);
+        const mCompPasses = safeVal(row.successful_passes || row.completed_passes || row.successfulPasses);
+        const mDuels = safeVal(row.duels);
+        const mDuelsWon = safeVal(row.duels_won || row.duelsWon);
+        const mTackles = safeVal(row.tackles);
+        const mTacklesWon = safeVal(row.tackles_won || row.tacklesWon);
+        const mGoals = safeVal(row.goals);
+
+        const mMatchId = row.match_id || row.matchId || `Match #${idx + 1}`;
+        const matchInfo = (matches || []).find(m => String(m.id).trim() === String(mMatchId).trim());
+
+        return {
+          matchName: matchInfo?.opponent ? `vs ${matchInfo.opponent}` : mMatchId,
+          date: matchInfo?.date || row.created_at?.slice(0, 10) || `2026-07-0${idx + 1}`,
+          goalConv: safeDivPct(mGoals, mShots),
+          passAcc: safeDivPct(mCompPasses, mPasses),
+          shotAcc: safeDivPct(mSot, mShots),
+          duelWon: safeDivPct(mDuelsWon, mDuels),
+          tackleWon: safeDivPct(mTacklesWon, mTackles),
+          result: matchInfo?.result || "Played"
+        };
+      });
+    }
+
     const safeMatches = Array.isArray(matches) ? matches : [];
     const ourMatches = safeMatches.filter(m => m && !m.isOpponentTeam).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
@@ -377,7 +405,7 @@ export default function IndividualPlayerDashboard({
       { matchName: "Match #2", date: "2026-07-11", goalConv: goalConvPct, passAcc, shotAcc: shotAccuracy, duelWon: duelWonPct, tackleWon: tackleWonPct, result: "N/A" },
       { matchName: "Match #3", date: "2026-07-18", goalConv: goalConvPct, passAcc, shotAcc: shotAccuracy, duelWon: duelWonPct, tackleWon: tackleWonPct, result: "N/A" }
     ];
-  }, [matches, goalConvPct, passAcc, shotAccuracy, duelWonPct, tackleWonPct]);
+  }, [fetchedPlayerStats, matches, goalConvPct, passAcc, shotAccuracy, duelWonPct, tackleWonPct]);
 
   const [selectedMatchFilter, setSelectedMatchFilter] = useState<string>("all");
 
