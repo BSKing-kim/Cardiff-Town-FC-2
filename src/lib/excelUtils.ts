@@ -587,112 +587,58 @@ export const parsePlayerStatsExcel = async (file: File): Promise<{ count: number
     return isNaN(parsed) ? defaultVal : parsed;
   };
 
-  // Build schema-exact payload for public.player_stats — NO extra/legacy columns
+  // Build schema-exact payload for public.player_stats — ONLY columns confirmed to exist in the table
   const sanitizedRows = rawRows.map(row => {
     const playerName   = extractString(row, ['player_name', 'Player Name', 'Name', 'name', 'username', 'Username', '선수명']);
     const matchId      = extractString(row, ['match_id', 'Match ID', 'Game ID', 'Match', '매치ID']) || 'M01';
 
     if (!playerName && !matchId) return null;
 
-    const playerNumber  = extractInt(row, ['player_number', 'Number', 'Jersey', 'Shirt', '등번호']);
-    const position      = extractString(row, ['position', 'Position', 'Pos', '포지션']);
-    const minutesPlayed = extractInt(row, ['minutes_played', 'Minutes Played', 'Minutes', 'Mins', '출전시간']);
+    // Sanitize every field as Number to prevent type errors or schema mismatches
+    const cleanPayload = {
+      id:             String(`${matchId}_${playerName.toLowerCase().replace(/[^a-z0-9]/g, '_') || extractInt(row, ['player_number', 'Number', 'Jersey', 'Shirt', '등번호'])}`).trim(),
+      match_id:       String(matchId).trim(),
+      player_name:    String(playerName).trim(),
+      player_number:  Number(extractInt(row, ['player_number', 'Number', 'Jersey', 'Shirt', '등번호'])) || 0,
+      position:       String(extractString(row, ['position', 'Position', 'Pos', '포지션'])).trim(),
+      minutes_played: Number(extractInt(row, ['minutes_played', 'Minutes Played', 'Minutes', 'Mins', '출전시간'])) || 0,
 
-    // Scoring
-    const goals   = extractInt(row, ['goals', 'Goals', '득점']);
-    const assists = extractInt(row, ['assists', 'Assists', '도움']);
+      // Scoring
+      goals:          Number(extractInt(row, ['goals', 'Goals', '득점'])) || 0,
 
-    // Shooting
-    const shots         = extractInt(row, ['shots', 'Shots', '슈팅']);
-    const shotsOnTarget = extractInt(row, ['shots_on_target', 'Shots On Target', 'SOT', 'sot']);
+      // Shooting
+      shots:          Number(extractInt(row, ['shots', 'Shots', '슈팅'])) || 0,
+      shots_on_target: Number(extractInt(row, ['shots_on_target', 'Shots On Target', 'SOT', 'sot'])) || 0,
 
-    // Passing — completed_passes is the primary schema column; successful_passes is accepted alias
-    const passes               = extractInt(row, ['passes', 'total_passes', 'Passes', 'Total Passes', '패스']);
-    const completedPasses      = extractInt(row, ['completed_passes', 'Completed Passes', 'successful_passes', 'Successful Passes']);
-    const keyPasses            = extractInt(row, ['key_passes', 'Key Passes']);
-    const successfulKeyPasses  = extractInt(row, ['successful_key_passes', 'Successful Key Passes']);
-    const longPasses           = extractInt(row, ['long_passes', 'Long Passes']);
-    const successfulLongPasses = extractInt(row, ['successful_long_passes', 'Successful Long Passes']);
-    const throughBalls         = extractInt(row, ['through_balls', 'Through Balls']);
-    const successfulThroughBalls = extractInt(row, ['successful_through_balls', 'Successful Through Balls']);
-    const crosses              = extractInt(row, ['crosses', 'Crosses']);
-    const successfulCrosses    = extractInt(row, ['successful_crosses', 'Successful Crosses']);
+      // Passing — use successful_passes as the safe alias (avoids completed_passes ambiguity)
+      passes:         Number(extractInt(row, ['passes', 'total_passes', 'Passes', 'Total Passes', '패스'])) || 0,
+      successful_passes: Number(extractInt(row, ['successful_passes', 'Successful Passes', 'completed_passes', 'Completed Passes'])) || 0,
+      key_passes:     Number(extractInt(row, ['key_passes', 'Key Passes'])) || 0,
+      long_passes:    Number(extractInt(row, ['long_passes', 'Long Passes'])) || 0,
+      through_balls:  Number(extractInt(row, ['through_balls', 'Through Balls'])) || 0,
+      crosses:        Number(extractInt(row, ['crosses', 'Crosses'])) || 0,
 
-    // Dribbling & duels
-    const dribbles           = extractInt(row, ['dribbles', 'Dribbles']);
-    const successfulDribbles = extractInt(row, ['successful_dribbles', 'Successful Dribbles']);
-    const duels              = extractInt(row, ['duels', 'Duels']);
-    const duelsWon           = extractInt(row, ['duels_won', 'Duels Won']);
-    const aerialDuels        = extractInt(row, ['aerial_duels', 'Aerial Duels']);
-    const aerialDuelsWon     = extractInt(row, ['aerial_duels_won', 'Aerial Duels Won']);
-    const groundDuels        = extractInt(row, ['ground_duels', 'Ground Duels']);
-    const groundDuelsWon     = extractInt(row, ['ground_duels_won', 'Ground Duels Won']);
+      // Dribbling & duels
+      dribbles:       Number(extractInt(row, ['dribbles', 'Dribbles'])) || 0,
+      duels:          Number(extractInt(row, ['duels', 'Duels'])) || 0,
+      duels_won:      Number(extractInt(row, ['duels_won', 'Duels Won'])) || 0,
 
-    // Defence
-    const tackles        = extractInt(row, ['tackles', 'Tackles']);
-    const tacklesWon     = extractInt(row, ['tackles_won', 'Tackles Won']);
-    const interceptions  = extractInt(row, ['interceptions', 'Interceptions']);
-    const clearances     = extractInt(row, ['clearances', 'Clearances']);
-    const blocks         = extractInt(row, ['blocks', 'Blocks']);
-    const ballRecoveries = extractInt(row, ['ball_recoveries', 'Ball Recoveries', 'recoveries']);
+      // Defence
+      tackles:        Number(extractInt(row, ['tackles', 'Tackles'])) || 0,
+      interceptions:  Number(extractInt(row, ['interceptions', 'Interceptions'])) || 0,
+      clearances:     Number(extractInt(row, ['clearances', 'Clearances'])) || 0,
+      blocks:         Number(extractInt(row, ['blocks', 'Blocks'])) || 0,
 
-    // Discipline
-    const turnovers   = extractInt(row, ['turnovers', 'Turnovers']);
-    const fouls       = extractInt(row, ['fouls', 'Fouls']);
-    const yellowCards = extractInt(row, ['yellow_cards', 'Yellow Cards']);
-    const redCards    = extractInt(row, ['red_cards', 'Red Cards']);
-
-    const recId = `${matchId}_${playerName.toLowerCase().replace(/[^a-z0-9]/g, '_') || playerNumber}`;
-
-    // Strictly schema-safe payload — exactly what public.player_stats accepts
-    return {
-      id:             recId,
-      match_id:       matchId,
-      player_name:    playerName,
-      player_number:  playerNumber,
-      position:       position,
-      minutes_played: minutesPlayed,
-
-      goals,
-      assists,
-      shots,
-      shots_on_target:  shotsOnTarget,
-
-      passes,
-      completed_passes:         completedPasses,
-      successful_passes:        completedPasses,
-      key_passes:               keyPasses,
-      successful_key_passes:    successfulKeyPasses,
-      long_passes:              longPasses,
-      successful_long_passes:   successfulLongPasses,
-      through_balls:            throughBalls,
-      successful_through_balls: successfulThroughBalls,
-      crosses,
-      successful_crosses:       successfulCrosses,
-
-      dribbles,
-      successful_dribbles:  successfulDribbles,
-      duels,
-      duels_won:            duelsWon,
-      aerial_duels:         aerialDuels,
-      aerial_duels_won:     aerialDuelsWon,
-      ground_duels:         groundDuels,
-      ground_duels_won:     groundDuelsWon,
-
-      tackles,
-      tackles_won:     tacklesWon,
-      interceptions,
-      clearances,
-      blocks,
-      ball_recoveries: ballRecoveries,
-
-      turnovers,
-      fouls,
-      yellow_cards: yellowCards,
-      red_cards:    redCards,
+      // Discipline
+      turnovers:      Number(extractInt(row, ['turnovers', 'Turnovers'])) || 0,
+      fouls:          Number(extractInt(row, ['fouls', 'Fouls'])) || 0,
+      yellow_cards:   Number(extractInt(row, ['yellow_cards', 'Yellow Cards'])) || 0,
+      red_cards:      Number(extractInt(row, ['red_cards', 'Red Cards'])) || 0,
 
       created_at: new Date().toISOString()
     };
+
+    return cleanPayload;
   }).filter(Boolean) as any[];
 
   if (sanitizedRows.length === 0) {
@@ -716,13 +662,11 @@ export const parsePlayerStatsExcel = async (file: File): Promise<{ count: number
     matchId:         r.match_id,
     playerName:      r.player_name,
     goals:           r.goals,
-    assists:         r.assists,
     shots:           r.shots,
     shotsOnTarget:   r.shots_on_target,
     totalPasses:     r.passes,
-    completedPasses: r.completed_passes,
+    completedPasses: r.successful_passes,
     tackles:         r.tackles,
-    tacklesWon:      r.tackles_won,
     interceptions:   r.interceptions,
     ...r
   })));
