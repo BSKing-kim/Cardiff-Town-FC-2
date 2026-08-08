@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Component, ReactNode, ErrorInfo } from "react";
 import { DataService } from "./lib/dataService";
 import { MatchData, Player, UserProfile, CustomTeam, UserRole } from "./types";
 
@@ -8,6 +8,7 @@ import MatchHub from "./components/MatchHub";
 import TeamDashboard from "./components/TeamDashboard";
 import OpponentAnalysis from "./components/OpponentAnalysis";
 import PlayerStats from "./components/PlayerStats";
+import MyPerformance from "./components/MyPerformance";
 import AdminPanel from "./components/AdminPanel";
 import ProfilePage from "./components/ProfilePage";
 import MatchFixtures from "./components/MatchFixtures";
@@ -17,10 +18,61 @@ import TeamStats from "./components/TeamStats";
 // Icons
 import { 
   TrendingUp, ArrowRightLeft, Users, UserCheck, LogOut, Smartphone,
-  Calendar, Sliders, Menu, X, Trophy, BarChart3, UserCog
+  Calendar, Sliders, Menu, X, Trophy, BarChart3, UserCog, AlertTriangle
 } from "lucide-react";
 
 import TeamLogo from "./components/TeamLogo";
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
+
+class AppErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  public state: ErrorBoundaryState = {
+    hasError: false
+  };
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("AppErrorBoundary caught a runtime rendering error:", error, errorInfo);
+  }
+
+  render() {
+    const inst = this as any;
+    if (inst.state?.hasError) {
+      return (
+        <div className="min-h-screen bg-[#0b0f19] text-white flex flex-col items-center justify-center p-6 text-center space-y-4">
+          <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400">
+            <AlertTriangle className="w-10 h-10 mx-auto mb-2" />
+            <h3 className="text-lg font-extrabold uppercase tracking-wide">Something Went Wrong</h3>
+            <p className="text-xs text-slate-300 mt-1 max-w-md font-mono">
+              {inst.state?.error?.message || "An unexpected rendering error occurred."}
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              if (inst.setState) inst.setState({ hasError: false });
+              window.location.reload();
+            }}
+            className="px-4 py-2 rounded-xl bg-[#eab308] text-[#0b0f19] font-bold text-xs hover:bg-yellow-400 transition-colors shadow-md cursor-pointer"
+          >
+            Reload Performance Hub
+          </button>
+        </div>
+      );
+    }
+
+    return inst.props?.children || null;
+  }
+}
 
 export type ActiveViewTab = 
   | "my-performance"
@@ -477,90 +529,92 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 mt-16" id="primary-viewport-pane">
-        
-        {/* Mobile View Maintenance Screen Notice */}
-        {isMobile && (
-          <div className="md:hidden mb-5 p-4 rounded-xl bg-[#1e293b] border border-[#eab308]/60 text-white shadow-lg flex items-start gap-3.5">
-            <div className="p-2.5 rounded-xl bg-[#eab308]/15 text-[#eab308] border border-[#eab308]/30 shrink-0 mt-0.5">
-              <Smartphone className="h-5 w-5" />
+        <AppErrorBoundary>
+          
+          {/* Mobile View Maintenance Screen Notice */}
+          {isMobile && (
+            <div className="md:hidden mb-5 p-4 rounded-xl bg-[#1e293b] border border-[#eab308]/60 text-white shadow-lg flex items-start gap-3.5">
+              <div className="p-2.5 rounded-xl bg-[#eab308]/15 text-[#eab308] border border-[#eab308]/30 shrink-0 mt-0.5">
+                <Smartphone className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-xs uppercase text-[#eab308] tracking-wider mb-1 flex items-center gap-1.5">
+                  <span>Mobile View under Maintenance</span>
+                </h4>
+                <p className="text-xs text-[#94a3b8] leading-relaxed font-sans">
+                  Please switch to Desktop/Laptop or turn your tablet horizontally for optimal analysis experience.
+                </p>
+              </div>
             </div>
-            <div>
-              <h4 className="font-extrabold text-xs uppercase text-[#eab308] tracking-wider mb-1 flex items-center gap-1.5">
-                <span>Mobile View under Maintenance</span>
-              </h4>
-              <p className="text-xs text-[#94a3b8] leading-relaxed font-sans">
-                Please switch to Desktop/Laptop or turn your tablet horizontally for optimal analysis experience.
-              </p>
+          )}
+
+          {/* Loading Spinner */}
+          {isDataLoading ? (
+            <div className="flex h-96 items-center justify-center">
+              <div className="flex flex-col items-center gap-3">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#eab308] border-t-transparent" />
+                <p className="text-xs text-[#94a3b8] font-mono tracking-wider">Loading Cardiff Town FC analytics...</p>
+              </div>
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="space-y-6">
+              
+              {/* View routing */}
+              {activeTab === "my-performance" && (
+                <MyPerformance currentUser={currentUser} players={players} matches={matches} />
+              )}
 
-        {/* Loading Spinner */}
-        {isDataLoading ? (
-          <div className="flex h-96 items-center justify-center">
-            <div className="flex flex-col items-center gap-3">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#eab308] border-t-transparent" />
-              <p className="text-xs text-[#94a3b8] font-mono tracking-wider">Loading Cardiff Town FC analytics...</p>
+              {activeTab === "match-hub" && (
+                <MatchHub matches={matches} currentUser={currentUser} onSelectOpponent={handleSelectOpponent} />
+              )}
+
+              {activeTab === "team" && (
+                <TeamDashboard matches={matches} customTeams={customTeams} currentUser={currentUser} onSelectOpponent={handleSelectOpponent} onTeamsUpdated={() => loadStatsData(true)} />
+              )}
+
+              {activeTab === "team-stats" && (
+                <TeamStats matches={matches} currentUser={currentUser} />
+              )}
+
+              {(activeTab === "team-standings" || activeTab === "league-table" || activeTab === "league-standing") && (
+                <LeagueStandings customTeams={customTeams} currentUser={currentUser} onSelectOpponent={handleSelectOpponent} onTeamsUpdated={() => loadStatsData(true)} />
+              )}
+
+              {(activeTab === "fixtures-results" || activeTab === "fixtures" || activeTab.startsWith("matches-")) && (
+                <MatchFixtures currentUser={currentUser} onSelectOpponent={handleSelectOpponent} defaultFilter="All" onFixturesUpdated={() => loadStatsData(true)} />
+              )}
+
+              {(activeTab === "roster-players" || activeTab === "roster" || activeTab === "players") && (
+                <PlayerStats players={players} matches={matches} onPlayersUpdated={() => loadStatsData(true)} currentUser={currentUser} />
+              )}
+
+              {(activeTab === "admin-center" || activeTab === "admin") && (
+                <AdminPanel 
+                  currentUser={currentUser} 
+                  users={allUsers} 
+                  onRefreshUsers={() => loadStatsData(true)} 
+                  onLogout={handleLogout}
+                  customTeams={customTeams}
+                  onTeamsUpdated={() => loadStatsData(true)}
+                />
+              )}
+
+              {(activeTab === "setting-profile" || activeTab === "profile") && (
+                <ProfilePage 
+                  currentUser={currentUser} 
+                  onUserUpdated={() => loadStatsData(true)} 
+                  onLogout={handleLogout}
+                />
+              )}
+
+              {(activeTab === "opponent" || activeTab === "opponent-analysis") && (
+                <OpponentAnalysis matches={matches} defaultOpponent={selectedOpponent} customTeams={customTeams} currentUser={currentUser} />
+              )}
+
             </div>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            
-            {/* View routing */}
-            {activeTab === "my-performance" && (
-              <PlayerStats players={players} matches={matches} onPlayersUpdated={() => loadStatsData(true)} currentUser={currentUser} isMyPerformanceView={true} />
-            )}
+          )}
 
-            {activeTab === "match-hub" && (
-              <MatchHub matches={matches} currentUser={currentUser} onSelectOpponent={handleSelectOpponent} />
-            )}
-
-            {activeTab === "team" && (
-              <TeamDashboard matches={matches} customTeams={customTeams} currentUser={currentUser} onSelectOpponent={handleSelectOpponent} onTeamsUpdated={() => loadStatsData(true)} />
-            )}
-
-            {activeTab === "team-stats" && (
-              <TeamStats matches={matches} currentUser={currentUser} />
-            )}
-
-            {(activeTab === "team-standings" || activeTab === "league-table" || activeTab === "league-standing") && (
-              <LeagueStandings customTeams={customTeams} currentUser={currentUser} onSelectOpponent={handleSelectOpponent} onTeamsUpdated={() => loadStatsData(true)} />
-            )}
-
-            {(activeTab === "fixtures-results" || activeTab === "fixtures" || activeTab.startsWith("matches-")) && (
-              <MatchFixtures currentUser={currentUser} onSelectOpponent={handleSelectOpponent} defaultFilter="All" onFixturesUpdated={() => loadStatsData(true)} />
-            )}
-
-            {(activeTab === "roster-players" || activeTab === "roster" || activeTab === "players") && (
-              <PlayerStats players={players} matches={matches} onPlayersUpdated={() => loadStatsData(true)} currentUser={currentUser} />
-            )}
-
-            {(activeTab === "admin-center" || activeTab === "admin") && (
-              <AdminPanel 
-                currentUser={currentUser} 
-                users={allUsers} 
-                onRefreshUsers={() => loadStatsData(true)} 
-                onLogout={handleLogout}
-                customTeams={customTeams}
-                onTeamsUpdated={() => loadStatsData(true)}
-              />
-            )}
-
-            {(activeTab === "setting-profile" || activeTab === "profile") && (
-              <ProfilePage 
-                currentUser={currentUser} 
-                onUserUpdated={() => loadStatsData(true)} 
-                onLogout={handleLogout}
-              />
-            )}
-
-            {(activeTab === "opponent" || activeTab === "opponent-analysis") && (
-              <OpponentAnalysis matches={matches} defaultOpponent={selectedOpponent} customTeams={customTeams} currentUser={currentUser} />
-            )}
-
-          </div>
-        )}
-
+        </AppErrorBoundary>
       </main>
 
       {/* Footer */}
