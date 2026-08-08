@@ -186,7 +186,7 @@ export default function LeagueStandings({
                 {activeDivision} Table
               </h3>
               <p className="text-[11px] text-[#94a3b8] font-mono">
-                {filteredStandings.length} Teams Registered • Win=3pts, Draw=1pt, Loss=0pt
+                {filteredStandings.length} Teams
               </p>
             </div>
           </div>

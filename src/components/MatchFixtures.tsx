@@ -594,11 +594,8 @@ export default function MatchFixtures({ currentUser, onSelectOpponent, defaultFi
         <div>
           <h2 className="font-display text-xl sm:text-2xl font-black tracking-wider text-white flex items-center gap-2">
             <Calendar className="h-6 w-6 text-[#eab308]" />
-            Match Performance Log Directory & Fixtures
+            Fixtures
           </h2>
-          <p className="text-xs text-[#94a3b8] font-sans mt-1">
-            Schedule upcoming matches, upload Excel statistics, and maintain official Cardiff Town FC fixture logs.
-          </p>
           {currentUser.role === UserRole.Player && (
             <p className="text-xs text-[#eab308] font-bold mt-1.5 font-sans">
               * Player View Mode: Read-only access to fixtures and match reports.

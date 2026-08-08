@@ -157,11 +157,8 @@ export default function ProfilePage({ currentUser, onUserUpdated, onLogout }: Pr
       <div className="border-b border-[#334155] pb-3">
         <h2 className="font-display text-xl sm:text-2xl font-black tracking-wide text-white flex items-center gap-2.5">
           <UserCog className="h-6 w-6 text-cyan-400" />
-          <span>User Profile & Account Credentials</span>
+          <span>Profile</span>
         </h2>
-        <p className="text-xs text-slate-400 mt-1">
-          Manage your personal credentials, role access applications, and portal password.
-        </p>
       </div>
 
       {errorSec && (
@@ -222,12 +219,9 @@ export default function ProfilePage({ currentUser, onUserUpdated, onLogout }: Pr
 
           {/* Bottom Section: APPLY FOR TACTICAL POSITION UPDATE */}
           <div className="pt-4 border-t border-[#334155]">
-            <p className="text-xs font-extrabold text-white uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+            <p className="text-xs font-extrabold text-white uppercase tracking-wider mb-3 flex items-center gap-1.5">
               <UserPlus className="h-4 w-4 text-cyan-400" />
               <span>APPLY FOR TACTICAL POSITION UPDATE</span>
-            </p>
-            <p className="text-[11px] text-slate-400 leading-relaxed font-sans mb-3">
-              Request elevated system credentials to contribute to match analysis or update squad listings.
             </p>
 
             {myApplication ? (

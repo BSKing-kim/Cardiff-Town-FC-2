@@ -738,7 +738,7 @@ export default function TeamDashboard({ matches, customTeams = [], onSelectOppon
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-[#334155] pb-4">
         <div className="flex items-center justify-between w-full sm:w-auto">
           <h2 className="font-display text-xl sm:text-2xl font-black tracking-tight text-white">
-            Team Analysis Dashboard
+            Team Dashboard
           </h2>
           
           {/* Mobile-only disabled Export Button right next to title */}

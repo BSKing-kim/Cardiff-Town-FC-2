@@ -85,36 +85,28 @@ export default function ExcelTemplates({ currentUser, onRefreshData }: ExcelTemp
         </div>
 
         {/* Templates Grid */}
-        <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {templates.map((tmpl) => {
             const IconComponent = tmpl.icon;
             return (
               <div 
                 key={tmpl.id}
-                className="border-2 border-dashed border-slate-700/80 hover:border-cyan-500/60 rounded-xl p-4 flex flex-col justify-between transition-all bg-slate-800/40 hover:bg-slate-800/70 shadow-md group"
+                className="border-2 border-dashed border-slate-700/80 hover:border-cyan-500/60 rounded-xl p-4 flex items-center justify-between transition-all bg-slate-800/40 hover:bg-slate-800/70 shadow-md group gap-3"
               >
-                <div className="space-y-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <div className="bg-cyan-500/15 border border-cyan-500/30 p-2.5 rounded-lg text-cyan-400 group-hover:scale-105 transition-transform">
-                      <IconComponent className="h-4 w-4" />
-                    </div>
-                    <h3 className="font-display font-bold text-sm text-white">{tmpl.title}</h3>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="bg-cyan-500/15 border border-cyan-500/30 p-2.5 rounded-lg text-cyan-400 group-hover:scale-105 transition-transform shrink-0">
+                    <IconComponent className="h-4 w-4" />
                   </div>
-                  <p className="text-xs text-slate-300 leading-relaxed">{tmpl.description}</p>
+                  <h3 className="font-display font-bold text-sm text-white truncate" title={tmpl.title}>{tmpl.title}</h3>
                 </div>
 
-                <div className="pt-4 border-t border-slate-700/60 mt-4 flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400 font-mono font-medium truncate max-w-[150px]" title={tmpl.filename}>
-                    {tmpl.filename}
-                  </span>
-                  <button
-                    onClick={tmpl.action}
-                    className="flex items-center gap-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold py-1.5 px-3 rounded-lg transition duration-150 shadow-sm cursor-pointer shrink-0"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    <span>Download</span>
-                  </button>
-                </div>
+                <button
+                  onClick={tmpl.action}
+                  className="flex items-center gap-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold py-1.5 px-3 rounded-lg transition duration-150 shadow-sm cursor-pointer shrink-0"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Download</span>
+                </button>
               </div>
             );
           })}

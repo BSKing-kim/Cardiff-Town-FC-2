@@ -154,11 +154,8 @@ export default function TeamStats({
             </div>
             <div>
               <h1 className="font-display font-black text-xl text-white uppercase tracking-wider">
-                Team Statistics Dashboard
+                Team Dashboard
               </h1>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Performance trends & cumulative match analytics fetched directly from <code className="text-amber-400">public.team_stats</code>
-              </p>
             </div>
           </div>
         </div>
@@ -196,11 +193,11 @@ export default function TeamStats({
               <div className="flex items-center gap-2">
                 <LineChartIcon className="h-5 w-5 text-amber-400" />
                 <h2 className="font-display font-black text-lg text-white uppercase tracking-wider">
-                  Last 10 Matches Trend Analysis
+                  Trend Analysis
                 </h2>
               </div>
               <span className="text-xs font-semibold text-slate-400 bg-slate-800/80 border border-slate-700/60 px-3 py-1 rounded-full">
-                Tracking {trendChartData.length} Recent Matches
+                Tracking : {trendChartData.length}
               </span>
             </div>
 
@@ -261,11 +258,11 @@ export default function TeamStats({
               <div className="flex items-center gap-2">
                 <Table className="h-5 w-5 text-amber-400" />
                 <h2 className="font-display font-black text-lg text-white uppercase tracking-wider">
-                  Overall Team Performance Summary
+                  Summary
                 </h2>
               </div>
               <span className="text-xs font-semibold text-slate-400 bg-slate-800/80 border border-slate-700/60 px-3 py-1 rounded-full">
-                Total Matches Analyzed: {summaryMetrics.totalMatches}
+                Analysed : {summaryMetrics.totalMatches}
               </span>
             </div>
 

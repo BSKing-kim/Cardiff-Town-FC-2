@@ -248,11 +248,8 @@ export default function MatchHub({ matches: propMatches, currentUser, onSelectOp
             </div>
             <div>
               <h1 className="font-display font-black text-xl text-white uppercase tracking-wider">
-                Match Hub Analysis
+                Match Hub
               </h1>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Head-to-Head Match Analytics & Metrics Comparison fetched directly from <code className="text-cyan-400">public.matches</code>
-              </p>
             </div>
           </div>
 
@@ -321,16 +318,16 @@ export default function MatchHub({ matches: propMatches, currentUser, onSelectOp
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-800 pb-2 gap-2">
             <h2 className="font-display font-black text-base text-white uppercase tracking-wider flex items-center gap-2">
               <TrendingUp className="h-4.5 w-4.5 text-cyan-400" />
-              Percentage & Accuracy KPIs (Home vs Away)
+              Dashboard (Home vs Away)
             </h2>
             <div className="flex items-center gap-4 text-xs font-mono font-bold">
               <span className="flex items-center gap-1.5 text-cyan-400">
                 <span className="w-3 h-3 rounded-full bg-[#1D4ED8] inline-block" />
-                {matchAnalysis.homeTeam} (Home)
+                Home
               </span>
               <span className="flex items-center gap-1.5 text-emerald-400">
                 <span className="w-3 h-3 rounded-full bg-[#10b981] inline-block" />
-                {matchAnalysis.awayTeam} (Away)
+                Away
               </span>
             </div>
           </div>
@@ -372,16 +369,16 @@ export default function MatchHub({ matches: propMatches, currentUser, onSelectOp
           <div className="border-b border-slate-800 pb-2">
             <h2 className="font-display font-black text-base text-white uppercase tracking-wider flex items-center gap-2">
               <Layers className="h-4.5 w-4.5 text-cyan-400" />
-              Detailed Numeric Stat Breakdown (Home vs Away)
+              Detailed (Home vs Away)
             </h2>
           </div>
 
           <div className="bg-[#0f172a] border border-slate-800 rounded-xl overflow-hidden shadow-xl">
             <div className="divide-y divide-slate-800/60 font-sans text-xs">
               <div className="bg-slate-900/90 p-3 grid grid-cols-3 text-center font-mono font-bold text-slate-400 text-[11px] uppercase tracking-wider border-b border-slate-800">
-                <span className="text-cyan-400">{matchAnalysis.homeTeam} (Home)</span>
+                <span className="text-cyan-400">Home</span>
                 <span className="text-white">Metric Label</span>
-                <span className="text-emerald-400">{matchAnalysis.awayTeam} (Away)</span>
+                <span className="text-emerald-400">Away</span>
               </div>
 
               {matchAnalysis.numericComparisonList.map((row, idx) => (
