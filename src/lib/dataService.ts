@@ -691,26 +691,38 @@ export class DataService {
     const uploadedPlayerIds = new Set(playerMatchRecords.map(r => String(r.playerId || r.player_id || r.id).toLowerCase().trim()));
 
     try {
-      const { data: dbRecords } = await supabase.from("player_match_records").select("*").eq("match_id", fixtureId);
+      const { data: dbRecords } = await (supabase.from("player_stats") as any).select("*").eq("match_id", fixtureId);
       const recordsList: any[] = dbRecords || [];
       if (recordsList.length > 0) {
         const staleRecords = recordsList.filter(r => !uploadedPlayerIds.has(String(r.player_id || r.playerId || r.id).toLowerCase().trim()));
         const stalePlayerIds = staleRecords.map(r => r.player_id || r.playerId || r.id).filter(Boolean);
 
         if (stalePlayerIds.length > 0) {
-          await supabase.from("player_match_records").delete().eq("match_id", fixtureId).in("player_id", stalePlayerIds);
+          await (supabase.from("player_stats") as any).delete().eq("match_id", fixtureId).in("player_id", stalePlayerIds);
           deletedCount = stalePlayerIds.length;
         }
       }
 
       // Upsert active player match records into Supabase
-      for (const rec of playerMatchRecords) {
-        await supabase.from("player_match_records").upsert(this.sanitizeForSupabase({
-          ...rec,
+      if (playerMatchRecords.length > 0) {
+        const psPayload = playerMatchRecords.map(rec => ({
+          id: rec.id || `${fixtureId}_${rec.playerId || rec.player_id || rec.playerName}`,
           match_id: fixtureId,
-          matchId: fixtureId,
-          date: fixture.date
+          player_id: rec.playerId || rec.player_id || null,
+          player_name: rec.playerName || rec.player_name || '',
+          position: rec.position || 'CM',
+          minutes_played: Number(rec.minutesPlayed || rec.minutes_played || 90),
+          goals: Number(rec.goals || 0),
+          assists: Number(rec.assists || 0),
+          shots: Number(rec.shots || 0),
+          shots_on_target: Number(rec.shotsOnTarget || rec.shots_on_target || 0),
+          passes: Number(rec.totalPasses || rec.passes || 0),
+          successful_passes: Number(rec.completedPasses || rec.successful_passes || 0),
+          completed_passes: Number(rec.completedPasses || rec.successful_passes || 0),
+          tackles: Number(rec.tackles || 0),
+          interceptions: Number(rec.interceptions || 0)
         }));
+        await (supabase.from("player_stats") as any).upsert(psPayload, { onConflict: "id" });
       }
     } catch (e) {
       console.warn("Supabase full sync player match records warning:", e);
@@ -1368,86 +1380,41 @@ export class DataService {
     }
   }
 
-  // Player Match Records
+  // Player Match Records (strictly querying public.player_stats)
   static async getPlayerMatchRecords(forceRefresh = false): Promise<any[]> {
     if (!forceRefresh) {
       const cached = this.getCached<any[]>("playerMatchRecords");
       if (cached) return cached;
     }
     try {
-      const recordMap = new Map<string, any>();
-
-      // 1. Query player_match_records
-      const { data, error } = await supabase.from("player_match_records").select("*");
+      const { data, error } = await (supabase.from("player_stats") as any).select("*");
       if (!error && Array.isArray(data)) {
-        data.forEach((r: any) => {
-          if (r.id || r.match_id || r.matchId) {
-            const key = r.id || `${r.match_id || r.matchId}_${r.player_id || r.playerId || r.player_name || r.playerName}`;
-            recordMap.set(key, r);
-          }
-        });
-      }
+        const mapped = data.map((r: any) => ({
+          id: r.id,
+          matchId: r.match_id,
+          playerId: r.player_id || r.user_id,
+          playerName: r.player_name || r.name,
+          position: r.position || "CM",
+          minutesPlayed: Number(r.minutes_played || r.minutesPlayed || 0),
+          goals: Number(r.goals || 0),
+          assists: Number(r.assists || 0),
+          shots: Number(r.shots || 0),
+          shotsOnTarget: Number(r.shots_on_target || 0),
+          totalPasses: Number(r.passes || r.total_passes || 0),
+          completedPasses: Number(r.successful_passes || r.completed_passes || 0),
+          keyPasses: Number(r.key_passes || 0),
+          tackles: Number(r.tackles || 0),
+          tacklesWon: Number(r.tackles_won || 0),
+          interceptions: Number(r.interceptions || 0),
+          clearances: Number(r.clearances || 0),
+          blocks: Number(r.blocks || 0)
+        }));
 
-      // 2. Query match_logs table
-      const { data: mlData, error: mlError } = await (supabase.from("match_logs") as any).select("*");
-      if (!mlError && Array.isArray(mlData)) {
-        mlData.forEach((r: any) => {
-          const key = r.id || `${r.match_id}_${r.player_id || r.player_name}`;
-          if (!recordMap.has(key)) {
-            recordMap.set(key, {
-              id: key,
-              matchId: r.match_id,
-              playerId: r.player_id,
-              playerName: r.player_name,
-              position: r.position || "CM",
-              minutesPlayed: r.minutes_played || 90,
-              goals: r.goals || 0,
-              shots: r.shots || 0,
-              totalPasses: r.total_passes || 0,
-              completedPasses: r.completed_passes || 0,
-              tackles: r.tackles || 0,
-              interceptions: r.interceptions || 0
-            });
-          }
-        });
-      }
-
-      // 3. Query player_stats table
-      const { data: psData, error: psError } = await (supabase.from("player_stats") as any).select("*");
-      if (!psError && Array.isArray(psData)) {
-        psData.forEach((r: any) => {
-          const key = r.id || `${r.match_id}_${r.player_id || r.user_id || r.player_name || r.name}`;
-          if (!recordMap.has(key)) {
-            recordMap.set(key, {
-              id: key,
-              matchId: r.match_id,
-              playerId: r.player_id || r.user_id,
-              playerName: r.player_name || r.name,
-              position: r.position || "CM",
-              minutesPlayed: r.minutes_played || 90,
-              goals: r.goals || 0,
-              assists: r.assists || 0,
-              shots: r.shots || 0,
-              shotsOnTarget: r.shots_on_target || 0,
-              totalPasses: r.passes || r.total_passes || 0,
-              completedPasses: r.successful_passes || r.completed_passes || 0,
-              tackles: r.tackles || 0,
-              tacklesWon: r.tackles_won || 0,
-              interceptions: r.interceptions || 0,
-              clearances: r.clearances || 0,
-              blocks: r.blocks || 0
-            });
-          }
-        });
-      }
-
-      if (recordMap.size > 0) {
-        const records = Array.from(recordMap.values());
-        localStorage.setItem("team_perf_analyzer_player_match_records", JSON.stringify(records));
-        return this.setCached("playerMatchRecords", records);
+        localStorage.setItem("team_perf_analyzer_player_match_records", JSON.stringify(mapped));
+        return this.setCached("playerMatchRecords", mapped);
       }
     } catch (e) {
-      console.warn("Supabase error getting player match records, falling back to LocalStorage:", e);
+      console.warn("Supabase error getting player_stats:", e);
     }
 
     const cached = localStorage.getItem("team_perf_analyzer_player_match_records");
@@ -1455,7 +1422,6 @@ export class DataService {
       try {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          this.savePlayerMatchRecords(parsed).catch(() => {});
           return this.setCached("playerMatchRecords", parsed);
         }
       } catch {}
@@ -1467,39 +1433,43 @@ export class DataService {
     this.invalidateCache("playerMatchRecords");
     localStorage.setItem("team_perf_analyzer_player_match_records", JSON.stringify(records));
 
+    if (!records || records.length === 0) return;
+
     try {
-      if (records.length > 0) {
-        await supabase.from("player_match_records").upsert(this.sanitizeForSupabase(records));
+      const payload = records.map(r => {
+        const matchId = r.matchId || r.match_id || "M01";
+        const playerName = r.playerName || r.player_name || "";
+        const playerId = r.playerId || r.player_id || "";
+        const recId = r.id || `${matchId}_${playerId || playerName.toLowerCase().replace(/[^a-z0-9]/g, "_")}`;
+        return {
+          id: recId,
+          match_id: matchId,
+          player_id: playerId || null,
+          player_name: playerName,
+          name: playerName,
+          position: r.position || "CM",
+          minutes_played: Number(r.minutesPlayed || r.minutes_played || 90),
+          goals: Number(r.goals || 0),
+          assists: Number(r.assists || 0),
+          shots: Number(r.shots || 0),
+          shots_on_target: Number(r.shotsOnTarget || r.shots_on_target || 0),
+          passes: Number(r.totalPasses || r.passes || 0),
+          successful_passes: Number(r.completedPasses || r.successful_passes || 0),
+          completed_passes: Number(r.completedPasses || r.successful_passes || 0),
+          tackles: Number(r.tackles || 0),
+          tackles_won: Number(r.tacklesWon || r.tackles_won || 0),
+          interceptions: Number(r.interceptions || 0),
+          created_at: new Date().toISOString()
+        };
+      });
 
-        const matchLogsPayload = records.map(r => {
-          const matchId = r.matchId || r.match_id || "M01";
-          const playerName = r.playerName || r.player_name || "";
-          const playerId = r.playerId || r.player_id || "";
-          const recId = r.id || `${matchId}_${playerId || playerName.toLowerCase().replace(/[^a-z0-9]/g, "_")}`;
-          return {
-            id: recId,
-            match_id: matchId,
-            player_id: playerId,
-            player_name: playerName,
-            position: r.position || "CM",
-            minutes_played: r.minutesPlayed || r.minutes_played || 90,
-            goals: r.goals || 0,
-            shots: r.shots || 0,
-            total_passes: r.totalPasses || r.total_passes || 0,
-            completed_passes: r.completedPasses || r.completed_passes || 0,
-            tackles: r.tackles || 0,
-            interceptions: r.interceptions || 0,
-            created_at: new Date().toISOString()
-          };
-        });
-
-        const { error: mlErr } = await (supabase.from("match_logs") as any).upsert(matchLogsPayload, { onConflict: "id" });
-        if (mlErr) {
-          await (supabase.from("match_logs") as any).upsert(matchLogsPayload);
-        }
+      const { error } = await (supabase.from("player_stats") as any)
+        .upsert(payload, { onConflict: "id" });
+      if (error) {
+        console.warn("Supabase player_stats upsert warning:", error.message);
       }
     } catch (e) {
-      console.warn("Supabase save player match records failed:", e);
+      console.warn("Supabase save player stats failed:", e);
     }
   }
 

@@ -3,6 +3,48 @@ import { MatchData, Player, CustomTeam } from "../types";
 import { supabase } from "./supabase";
 import { DataService } from "./dataService";
 
+// Unified Data Coercion & Excel Extraction Helpers
+export const safeTrim = (val: any): string => {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'object' && val.result !== undefined) return String(val.result).trim();
+  return String(val).trim();
+};
+
+export const safeNum = (val: any, defaultVal = 0): number => {
+  if (val === null || val === undefined || val === '') return defaultVal;
+  const num = Number(val);
+  if (!isNaN(num)) return num;
+  const cleaned = String(val).replace(/[^0-9.-]/g, '');
+  const parsed = Number(cleaned);
+  return isNaN(parsed) ? defaultVal : parsed;
+};
+
+export const extractExcelString = (row: Record<string, any>, aliases: string[]): string => {
+  if (!row || typeof row !== 'object') return '';
+  const normAliases = aliases.map(a => a.toLowerCase().replace(/[^a-z0-9]/g, ''));
+  for (const [key, val] of Object.entries(row)) {
+    const normKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (normAliases.includes(normKey)) {
+      const strVal = safeTrim(val);
+      if (strVal !== '') return strVal;
+    }
+  }
+  return '';
+};
+
+export const extractExcelInt = (row: Record<string, any>, aliases: string[], defaultVal = 0): number => {
+  const strVal = extractExcelString(row, aliases);
+  if (!strVal) return defaultVal;
+  return safeNum(strVal, defaultVal);
+};
+
+export const extractExcelFloat = (row: Record<string, any>, aliases: string[], defaultVal = 0): number => {
+  const strVal = extractExcelString(row, aliases);
+  if (!strVal) return defaultVal;
+  const num = parseFloat(strVal.replace(/[^0-9.-]/g, ''));
+  return isNaN(num) ? defaultVal : num;
+};
+
 export const parseAndUploadExcel = async (
   file: File,
   tableName: 'teams' | 'match_logs' | 'players'
@@ -28,26 +70,8 @@ export const parseAndUploadExcel = async (
     throw new Error("Excel file is empty or missing valid rows.");
   }
 
-  // Flexible Header Extraction & Coercion Helpers
-  const extractString = (row: Record<string, any>, aliases: string[]): string => {
-    const normAliases = aliases.map(a => a.toLowerCase().replace(/[^a-z0-9]/g, ""));
-    for (const [key, val] of Object.entries(row)) {
-      const normKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
-      if (normAliases.includes(normKey)) {
-        const strVal = String(val !== undefined && val !== null ? val : "").trim();
-        if (strVal !== "") return strVal;
-      }
-    }
-    return "";
-  };
-
-  const extractInt = (row: Record<string, any>, aliases: string[], defaultVal = 0): number => {
-    const strVal = extractString(row, aliases);
-    if (!strVal) return defaultVal;
-    const cleaned = strVal.replace(/[^0-9.-]/g, "");
-    const parsed = parseInt(cleaned, 10);
-    return isNaN(parsed) ? defaultVal : parsed;
-  };
+  const extractString = extractExcelString;
+  const extractInt = extractExcelInt;
 
   let sanitizedPayload: any[] = [];
 
@@ -165,11 +189,11 @@ export const parseAndUploadExcel = async (
     }
 
     try {
-      const { error } = await (supabase.from('match_logs') as any)
+      const { error } = await (supabase.from('player_stats') as any)
         .upsert(sanitizedPayload, { onConflict: 'id' });
-      if (error) console.warn("Supabase match_logs upsert warning:", error.message);
+      if (error) console.warn("Supabase player_stats upsert warning:", error.message);
     } catch (e) {
-      console.warn("Supabase match_logs exception:", e);
+      console.warn("Supabase player_stats exception:", e);
     }
 
     // Mirror to DataService / player_match_records
@@ -260,33 +284,9 @@ export const parseMatchFixturesExcel = async (file: File): Promise<{ count: numb
     throw new Error("Excel file is empty or missing valid rows.");
   }
 
-  const extractString = (row: Record<string, any>, aliases: string[]): string => {
-    const normAliases = aliases.map(a => a.toLowerCase().replace(/[^a-z0-9]/g, ""));
-    for (const [key, val] of Object.entries(row)) {
-      const normKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
-      if (normAliases.includes(normKey)) {
-        const strVal = String(val !== undefined && val !== null ? val : "").trim();
-        if (strVal !== "") return strVal;
-      }
-    }
-    return "";
-  };
-
-  const extractInt = (row: Record<string, any>, aliases: string[], defaultVal = 0): number => {
-    const strVal = extractString(row, aliases);
-    if (!strVal) return defaultVal;
-    const cleaned = strVal.replace(/[^0-9.-]/g, "");
-    const parsed = parseInt(cleaned, 10);
-    return isNaN(parsed) ? defaultVal : parsed;
-  };
-
-  const extractFloat = (row: Record<string, any>, aliases: string[], defaultVal = 50): number => {
-    const strVal = extractString(row, aliases);
-    if (!strVal) return defaultVal;
-    const cleaned = strVal.replace(/[^0-9.-]/g, "");
-    const parsed = parseFloat(cleaned);
-    return isNaN(parsed) ? defaultVal : parsed;
-  };
+  const extractString = extractExcelString;
+  const extractInt = extractExcelInt;
+  const extractFloat = extractExcelFloat;
 
   const safeDivPct = (num: number, den: number): number => {
     if (!den || den === 0) return 0;
@@ -580,26 +580,8 @@ export const parsePlayerStatsExcel = async (file: File, matchIdOverride?: string
     console.warn("Could not pre-fetch profiles/players for player matching:", e);
   }
 
-  // Flexible header extraction helpers
-  const extractString = (row: Record<string, any>, aliases: string[]): string => {
-    const normAliases = aliases.map(a => a.toLowerCase().replace(/[^a-z0-9]/g, ""));
-    for (const [key, val] of Object.entries(row)) {
-      const normKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
-      if (normAliases.includes(normKey)) {
-        const strVal = String(val !== undefined && val !== null ? val : "").trim();
-        if (strVal !== "") return strVal;
-      }
-    }
-    return "";
-  };
-
-  const extractInt = (row: Record<string, any>, aliases: string[], defaultVal = 0): number => {
-    const strVal = extractString(row, aliases);
-    if (!strVal) return defaultVal;
-    const cleaned = strVal.replace(/[^0-9.-]/g, "");
-    const parsed = parseInt(cleaned, 10);
-    return isNaN(parsed) ? defaultVal : parsed;
-  };
+  const extractString = extractExcelString;
+  const extractInt = extractExcelInt;
 
   // Build schema-exact payload for public.player_stats — ONLY columns confirmed to exist in the table
   const sanitizedRows = rawRows.map(row => {
