@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Player, UserProfile, MatchData, UserRole, ProfileUpdateRequest } from "../types";
 import { DataService } from "../lib/dataService";
 import { supabase } from "../lib/supabase";
-import { Shield, Clock, BarChart2, List, Lock, Footprints, Flag, Edit3, UserCheck, ChevronRight, Target, Award, AlertTriangle, CheckCircle2, X } from "lucide-react";
+import { Shield, Clock, BarChart2, List, Lock, Footprints, Flag, Edit3, UserCheck, ChevronRight, Target, Award, AlertTriangle, CheckCircle2, X, ArrowRightLeft, Zap, ShieldAlert, RefreshCw, ShieldCheck } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
 
 interface IndividualPlayerDashboardProps {
@@ -409,52 +409,157 @@ export default function IndividualPlayerDashboard({
 
   const [selectedMatchFilter, setSelectedMatchFilter] = useState<string>("all");
 
-  // Detailed Metrics Section - Exact list in order requested (34 items)
-  const selectedMetricsList = useMemo(() => {
-    return [
-      { label: "Passes", value: `${passes}` },
-      { label: "Backwards", value: `${backwardsPasses}` },
-      { label: "Forwards", value: `${forwardsPasses}` },
-      { label: "Long Passes", value: `${longPasses}` },
-      { label: "Key Passes", value: `${keyPasses}` },
-      { label: "Through Balls", value: `${throughBalls}` },
-      { label: "Crosses", value: `${crosses}` },
-      { label: "Long Pass Suc %", value: safeDivStr(successfulLongPasses, longPasses) },
-      { label: "Key Pass Suc %", value: safeDivStr(successfulKeyPasses, keyPasses) },
-      { label: "Through Ball Suc %", value: safeDivStr(successfulThroughBalls, throughBalls) },
-      { label: "Cross Suc %", value: safeDivStr(successfulCrosses, crosses) },
-      { label: "Dribbles", value: `${dribbles}` },
-      { label: "Dribble Suc %", value: safeDivStr(successfulDribbles, dribbles) },
-      { label: "Duels", value: `${duels}` },
-      { label: "Duel Wons", value: `${duelsWon}` },
-      { label: "Aerial Duels", value: `${aerialDuels}` },
-      { label: "Aerial Duel Wons", value: `${aerialDuelsWon}` },
-      { label: "Ground Duels", value: `${groundDuels}` },
-      { label: "Ground Duel Wons", value: `${groundDuelsWon}` },
-      { label: "Ball Recovery", value: `${ballRecoveries}` },
-      { label: "Tackles", value: `${tackles}` },
-      { label: "Tackle Wons", value: `${tacklesWon}` },
-      { label: "Interceptions", value: `${interceptions}` },
-      { label: "Clearance", value: `${clearances}` },
-      { label: "Blocked", value: `${blocks}` },
-      { label: "Own Goals", value: `${ownGoals}` },
-      { label: "Turnovers", value: `${turnovers}` },
-      { label: "Miscontrol", value: `${miscontrols}` },
-      { label: "Uns Dribble", value: `${unsuccessfulDribbles}` },
-      { label: "Possession Lost", value: `${possessionLost}` },
-      { label: "Offside", value: `${offsides}` },
-      { label: "Fouls", value: `${fouls}` },
-      { label: "Yellow Card", value: `${yellowCards}` },
-      { label: "Red Card", value: `${redCards}` }
-    ];
+  // Active Metrics calculation for Selected Match or All Matches (Aggregated)
+  const activeMetrics = useMemo(() => {
+    if (selectedMatchFilter !== "all" && fetchedPlayerStats && fetchedPlayerStats[Number(selectedMatchFilter)]) {
+      const row = fetchedPlayerStats[Number(selectedMatchFilter)];
+      return {
+        passes: safeVal(row.passes || row.total_passes || row.totalPasses),
+        backwardsPasses: safeVal(row.backwards_passes || row.backwardPasses),
+        forwardsPasses: safeVal(row.forwards_passes || row.forwardPasses),
+        longPasses: safeVal(row.long_passes || row.longPasses),
+        successfulLongPasses: safeVal(row.successful_long_passes || row.successfulLongPasses),
+        keyPasses: safeVal(row.key_passes || row.keyPasses),
+        successfulKeyPasses: safeVal(row.successful_key_passes || row.successfulKeyPasses),
+        throughBalls: safeVal(row.through_balls || row.throughBalls),
+        successfulThroughBalls: safeVal(row.successful_through_balls || row.successfulThroughBalls),
+        crosses: safeVal(row.crosses),
+        successfulCrosses: safeVal(row.successful_crosses || row.successfulCrosses),
+        dribbles: safeVal(row.dribbles),
+        successfulDribbles: safeVal(row.successful_dribbles || row.successfulDribbles),
+        duels: safeVal(row.duels),
+        duelsWon: safeVal(row.duels_won || row.duelsWon),
+        aerialDuels: safeVal(row.aerial_duels || row.aerialDuels),
+        aerialDuelsWon: safeVal(row.aerial_duels_won || row.aerialDuelsWon),
+        groundDuels: safeVal(row.ground_duels || row.defensiveDuels),
+        groundDuelsWon: safeVal(row.ground_duels_won || row.defensiveDuelsWon),
+        tackles: safeVal(row.tackles),
+        tacklesWon: safeVal(row.tackles_won || row.tacklesWon),
+        interceptions: safeVal(row.interceptions),
+        clearances: safeVal(row.clearances),
+        blocks: safeVal(row.blocks),
+        ownGoals: safeVal(row.own_goals || row.ownGoals),
+        turnovers: safeVal(row.turnovers),
+        miscontrols: safeVal(row.miscontrols || row.miscontrol),
+        unsuccessfulDribbles: safeVal(row.unsuccessful_dribbles || row.unsuccessfulDribble),
+        possessionLost: safeVal(row.possession_lost || row.possessionLost),
+        offsides: safeVal(row.offsides || row.offside),
+        fouls: safeVal(row.fouls),
+        yellowCards: safeVal(row.yellow_cards || row.yellowCards),
+        redCards: safeVal(row.red_cards || row.redCards),
+      };
+    }
+    return {
+      passes, backwardsPasses, forwardsPasses, longPasses, successfulLongPasses,
+      keyPasses, successfulKeyPasses, throughBalls, successfulThroughBalls,
+      crosses, successfulCrosses, dribbles, successfulDribbles, duels, duelsWon,
+      aerialDuels, aerialDuelsWon, groundDuels, groundDuelsWon, tackles, tacklesWon,
+      interceptions, clearances, blocks, ownGoals, turnovers, miscontrols,
+      unsuccessfulDribbles, possessionLost, offsides, fouls, yellowCards, redCards
+    };
   }, [
-    passes, backwardsPasses, forwardsPasses, longPasses, successfulLongPasses,
-    keyPasses, successfulKeyPasses, throughBalls, successfulThroughBalls,
-    crosses, successfulCrosses, dribbles, successfulDribbles, duels, duelsWon,
-    aerialDuels, aerialDuelsWon, groundDuels, groundDuelsWon, ballRecoveries,
+    selectedMatchFilter, fetchedPlayerStats, passes, backwardsPasses, forwardsPasses,
+    longPasses, successfulLongPasses, keyPasses, successfulKeyPasses, throughBalls,
+    successfulThroughBalls, crosses, successfulCrosses, dribbles, successfulDribbles,
+    duels, duelsWon, aerialDuels, aerialDuelsWon, groundDuels, groundDuelsWon,
     tackles, tacklesWon, interceptions, clearances, blocks, ownGoals, turnovers,
     miscontrols, unsuccessfulDribbles, possessionLost, offsides, fouls, yellowCards, redCards
   ]);
+
+  // 6 Distinct Category Cards Layout Structure
+  const categoryCards = useMemo(() => {
+    const m = activeMetrics;
+    return [
+      {
+        id: "pass",
+        title: "Pass",
+        icon: ArrowRightLeft,
+        accentColor: "border-[#eab308]/40 text-[#eab308]",
+        headerBg: "bg-[#0b0f19]",
+        items: [
+          { label: "Passes", value: `${m.passes}` },
+          { label: "Backwards", value: `${m.backwardsPasses}` },
+          { label: "Forwards", value: `${m.forwardsPasses}` },
+          { label: "Long Passes", value: `${m.longPasses}` },
+          { label: "Long Pass Suc %", value: safeDivStr(m.successfulLongPasses, m.longPasses), isPct: true },
+          { label: "Key Passes", value: `${m.keyPasses}` },
+          { label: "Key Pass Suc %", value: safeDivStr(m.successfulKeyPasses, m.keyPasses), isPct: true },
+          { label: "Through Balls", value: `${m.throughBalls}` },
+          { label: "Through Ball Suc %", value: safeDivStr(m.successfulThroughBalls, m.throughBalls), isPct: true },
+          { label: "Crosses", value: `${m.crosses}` },
+          { label: "Cross Suc %", value: safeDivStr(m.successfulCrosses, m.crosses), isPct: true },
+        ]
+      },
+      {
+        id: "dribble",
+        title: "Dribble",
+        icon: Zap,
+        accentColor: "border-cyan-500/40 text-cyan-400",
+        headerBg: "bg-[#0b0f19]",
+        items: [
+          { label: "Dribbles", value: `${m.dribbles}` },
+          { label: "Dribble Suc", value: `${m.successfulDribbles}` },
+          { label: "Dribble Suc %", value: safeDivStr(m.successfulDribbles, m.dribbles), isPct: true }
+        ]
+      },
+      {
+        id: "duel",
+        title: "Duel",
+        icon: ShieldAlert,
+        accentColor: "border-amber-500/40 text-amber-400",
+        headerBg: "bg-[#0b0f19]",
+        items: [
+          { label: "Duels", value: `${m.duels}` },
+          { label: "Duel Won", value: `${m.duelsWon}` },
+          { label: "Aerial Duels", value: `${m.aerialDuels}` },
+          { label: "Aerial Duel Won", value: `${m.aerialDuelsWon}` },
+          { label: "Ground Duels", value: `${m.groundDuels}` },
+          { label: "Ground Duel Won", value: `${m.groundDuelsWon}` }
+        ]
+      },
+      {
+        id: "defensive",
+        title: "Defensive",
+        icon: Shield,
+        accentColor: "border-emerald-500/40 text-emerald-400",
+        headerBg: "bg-[#0b0f19]",
+        items: [
+          { label: "Tackles", value: `${m.tackles}` },
+          { label: "Tackle Won", value: `${m.tacklesWon}` },
+          { label: "Interceptions", value: `${m.interceptions}` },
+          { label: "Clearance", value: `${m.clearances}` },
+          { label: "Blocks", value: `${m.blocks}` }
+        ]
+      },
+      {
+        id: "turnover",
+        title: "Turnover",
+        icon: RefreshCw,
+        accentColor: "border-orange-500/40 text-orange-400",
+        headerBg: "bg-[#0b0f19]",
+        items: [
+          { label: "Turnovers", value: `${m.turnovers}` },
+          { label: "Own Goals", value: `${m.ownGoals}` },
+          { label: "Miscontrol", value: `${m.miscontrols}` },
+          { label: "Uns Dribble", value: `${m.unsuccessfulDribbles}` },
+          { label: "Possession Lost", value: `${m.possessionLost}` },
+          { label: "Offside", value: `${m.offsides}` }
+        ]
+      },
+      {
+        id: "foul",
+        title: "Foul",
+        icon: AlertTriangle,
+        accentColor: "border-rose-500/40 text-rose-400",
+        headerBg: "bg-[#0b0f19]",
+        items: [
+          { label: "Fouls", value: `${m.fouls}` },
+          { label: "Yellow Cards", value: `${m.yellowCards}` },
+          { label: "Red Cards", value: `${m.redCards}` }
+        ]
+      }
+    ];
+  }, [activeMetrics]);
 
   const preferredFoot = (currentUser as any)?.preferred_foot || (currentUser as any)?.preferredFoot || activePlayerObj.preferredFoot || "Right";
   const nationality = (currentUser as any)?.nationality || activePlayerObj.nationality || "Wales";
@@ -781,8 +886,8 @@ export default function IndividualPlayerDashboard({
         </div>
       </div>
 
-      {/* 4. Detailed Performance Metrics (Match Hub List Style) */}
-      <div className="bg-[#1e293b] border border-[#334155] rounded-2xl p-5 sm:p-6 shadow-lg space-y-4">
+      {/* 4. Detailed Performance Metrics (6 Category Card Grids) */}
+      <div className="bg-[#1e293b] border border-[#334155] rounded-2xl p-5 sm:p-6 shadow-lg space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#334155] pb-3 gap-3">
           <div className="flex items-center gap-2.5">
             <List className="h-5 w-5 text-[#10b981]" />
@@ -807,21 +912,44 @@ export default function IndividualPlayerDashboard({
           </div>
         </div>
 
-        {/* Stat Grid Card System */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {selectedMetricsList.map((item, idx) => (
-            <div 
-              key={idx} 
-              className="bg-[#0B0F19] border border-slate-800 p-4 rounded-xl flex flex-col justify-between shadow-md hover:border-slate-700 transition-colors min-h-[92px]"
-            >
-              <span className="text-slate-400 text-xs font-medium uppercase tracking-wider block">
-                {item.label}
-              </span>
-              <div className="text-yellow-400 text-2xl font-bold font-mono mt-2">
-                {item.value}
+        {/* 6 Category Cards Container */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {categoryCards.map((card) => {
+            const IconComp = card.icon;
+            return (
+              <div 
+                key={card.id} 
+                className="bg-[#0b0f19] border border-slate-800 rounded-xl overflow-hidden shadow-md flex flex-col justify-between hover:border-slate-700 transition-colors"
+              >
+                {/* Category Header */}
+                <div className={`px-4 py-3 border-b border-slate-800/80 ${card.headerBg} flex items-center justify-between`}>
+                  <div className="flex items-center gap-2">
+                    <IconComp className={`w-4 h-4 ${card.accentColor.split(" ")[1]}`} />
+                    <h4 className="font-extrabold text-sm text-white tracking-wider uppercase font-mono">
+                      {card.title}
+                    </h4>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-mono uppercase bg-slate-900/80 px-2 py-0.5 rounded border border-slate-800 font-semibold">
+                    {card.items.length} Metrics
+                  </span>
+                </div>
+
+                {/* Metrics Items List */}
+                <div className="p-4 space-y-2 flex-1">
+                  {card.items.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between py-1 border-b border-slate-800/40 last:border-0 text-xs">
+                      <span className="text-slate-400 font-medium font-sans">
+                        {item.label}
+                      </span>
+                      <span className={`font-bold font-mono text-sm ${item.isPct ? "text-cyan-400" : "text-white"}`}>
+                        {item.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
