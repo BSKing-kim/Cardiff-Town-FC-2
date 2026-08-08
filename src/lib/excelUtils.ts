@@ -595,51 +595,60 @@ export const parsePlayerStatsExcel = async (file: File): Promise<{ count: number
     if (!playerName && !matchId) return null;
 
     // Sanitize every field as Number to prevent type errors or schema mismatches
+    // Dual player_name / name mapping — Supabase accepts whichever column exists
+    const nameVal = String(playerName).trim();
     const cleanPayload = {
-      id:             String(`${matchId}_${playerName.toLowerCase().replace(/[^a-z0-9]/g, '_') || extractInt(row, ['player_number', 'Number', 'Jersey', 'Shirt', '등번호'])}`).trim(),
+      id:             String(`${matchId}_${nameVal.toLowerCase().replace(/[^a-z0-9]/g, '_') || extractInt(row, ['player_number', 'Number', 'Jersey', 'Shirt', '등번호'])}`).trim(),
       match_id:       String(matchId).trim(),
-      player_name:    String(playerName).trim(),
+      player_name:    nameVal,           // primary column name
+      name:           nameVal,           // dual fallback for schema compatibility
       player_number:  Number(extractInt(row, ['player_number', 'Number', 'Jersey', 'Shirt', '등번호'])) || 0,
       position:       String(extractString(row, ['position', 'Position', 'Pos', '포지션'])).trim(),
       minutes_played: Number(extractInt(row, ['minutes_played', 'Minutes Played', 'Minutes', 'Mins', '출전시간'])) || 0,
 
       // Scoring
-      goals:          Number(extractInt(row, ['goals', 'Goals', '득점'])) || 0,
+      goals:               Number(extractInt(row, ['goals', 'Goals', '득점'])) || 0,
+      assists:             Number(extractInt(row, ['assists', 'Assists', '도움'])) || 0,
 
       // Shooting
-      shots:          Number(extractInt(row, ['shots', 'Shots', '슈팅'])) || 0,
-      shots_on_target: Number(extractInt(row, ['shots_on_target', 'Shots On Target', 'SOT', 'sot'])) || 0,
+      shots:               Number(extractInt(row, ['shots', 'Shots', '슈팅'])) || 0,
+      shots_on_target:     Number(extractInt(row, ['shots_on_target', 'Shots On Target', 'SOT', 'sot'])) || 0,
 
-      // Passing — use successful_passes as the safe alias (avoids completed_passes ambiguity)
-      passes:         Number(extractInt(row, ['passes', 'total_passes', 'Passes', 'Total Passes', '패스'])) || 0,
-      successful_passes: Number(extractInt(row, ['successful_passes', 'Successful Passes', 'completed_passes', 'Completed Passes'])) || 0,
-      key_passes:     Number(extractInt(row, ['key_passes', 'Key Passes'])) || 0,
-      long_passes:    Number(extractInt(row, ['long_passes', 'Long Passes'])) || 0,
-      through_balls:  Number(extractInt(row, ['through_balls', 'Through Balls'])) || 0,
-      crosses:        Number(extractInt(row, ['crosses', 'Crosses'])) || 0,
+      // Passing — both column variants sent for schema compatibility
+      passes:              Number(extractInt(row, ['passes', 'total_passes', 'Passes', 'Total Passes', '패스'])) || 0,
+      successful_passes:   Number(extractInt(row, ['successful_passes', 'Successful Passes', 'completed_passes', 'Completed Passes'])) || 0,
+      completed_passes:    Number(extractInt(row, ['completed_passes', 'Completed Passes', 'successful_passes', 'Successful Passes'])) || 0,
+      key_passes:          Number(extractInt(row, ['key_passes', 'Key Passes'])) || 0,
+      long_passes:         Number(extractInt(row, ['long_passes', 'Long Passes'])) || 0,
+      through_balls:       Number(extractInt(row, ['through_balls', 'Through Balls'])) || 0,
+      crosses:             Number(extractInt(row, ['crosses', 'Crosses'])) || 0,
 
       // Dribbling & duels
-      dribbles:       Number(extractInt(row, ['dribbles', 'Dribbles'])) || 0,
-      duels:          Number(extractInt(row, ['duels', 'Duels'])) || 0,
-      duels_won:      Number(extractInt(row, ['duels_won', 'Duels Won'])) || 0,
+      dribbles:            Number(extractInt(row, ['dribbles', 'Dribbles'])) || 0,
+      successful_dribbles: Number(extractInt(row, ['successful_dribbles', 'Successful Dribbles'])) || 0,
+      duels:               Number(extractInt(row, ['duels', 'Duels'])) || 0,
+      duels_won:           Number(extractInt(row, ['duels_won', 'Duels Won'])) || 0,
 
       // Defence
-      tackles:        Number(extractInt(row, ['tackles', 'Tackles'])) || 0,
-      interceptions:  Number(extractInt(row, ['interceptions', 'Interceptions'])) || 0,
-      clearances:     Number(extractInt(row, ['clearances', 'Clearances'])) || 0,
-      blocks:         Number(extractInt(row, ['blocks', 'Blocks'])) || 0,
+      tackles:             Number(extractInt(row, ['tackles', 'Tackles'])) || 0,
+      tackles_won:         Number(extractInt(row, ['tackles_won', 'Tackles Won'])) || 0,
+      interceptions:       Number(extractInt(row, ['interceptions', 'Interceptions'])) || 0,
+      clearances:          Number(extractInt(row, ['clearances', 'Clearances'])) || 0,
+      blocks:              Number(extractInt(row, ['blocks', 'Blocks'])) || 0,
+      ball_recoveries:     Number(extractInt(row, ['ball_recoveries', 'Ball Recoveries', 'recoveries'])) || 0,
 
       // Discipline
-      turnovers:      Number(extractInt(row, ['turnovers', 'Turnovers'])) || 0,
-      fouls:          Number(extractInt(row, ['fouls', 'Fouls'])) || 0,
-      yellow_cards:   Number(extractInt(row, ['yellow_cards', 'Yellow Cards'])) || 0,
-      red_cards:      Number(extractInt(row, ['red_cards', 'Red Cards'])) || 0,
+      turnovers:           Number(extractInt(row, ['turnovers', 'Turnovers'])) || 0,
+      fouls:               Number(extractInt(row, ['fouls', 'Fouls'])) || 0,
+      yellow_cards:        Number(extractInt(row, ['yellow_cards', 'Yellow Cards'])) || 0,
+      red_cards:           Number(extractInt(row, ['red_cards', 'Red Cards'])) || 0,
 
       created_at: new Date().toISOString()
     };
 
     return cleanPayload;
   }).filter(Boolean) as any[];
+
 
   if (sanitizedRows.length === 0) {
     throw new Error("No valid player stat rows found in file.");
